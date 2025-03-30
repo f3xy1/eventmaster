@@ -1,0 +1,138 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f5f5f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+.logo {
+    font-size: 36px;
+    font-weight: bold;
+    color: #1a237e;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.login-container {
+    background-color: white;
+    padding: 20px 40px 40px 40px;
+    border-radius: 24px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
+    width: 350px;
+    text-align: center;
+}
+
+h2 {
+    font-size: 28px;
+    margin-bottom: 10px;
+    color: #333;
+    text-align: left;
+}
+
+.form-group {
+    position: relative;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+    outline: none;
+    font-size: 16px;
+}
+
+.password-group {
+    position: relative;
+}
+
+.password-input {
+    position: relative;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    font-size: 16px;
+}
+
+.options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: baseline;
+}
+
+.remember-me input {
+    margin-right: 8px;
+    align-self: flex-start;
+}
+
+.forgot-password {
+    color: #4285f4;
+    text-decoration: none;
+    align-self: baseline;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+.login-button {
+    width: 100%;
+    padding: 14px;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.login-button:hover {
+    background-color: #3367d6;
+}
+
+.signup-link {
+    text-align: center;
+}
+
+.signup-link a {
+    color: #4285f4;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.signup-link a:hover {
+    text-decoration: underline;
+}

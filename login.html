@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="css/login-page-style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1 class="logo">EventMaster</h1>
+        
+        <h2>Вход</h2>
+
+        <form>
+            <div class="form-group">
+                <label for="email">Логин или почта</label>
+                <input type="email" id="email" required>
+            </div>
+
+            <div class="form-group password-group">
+                <label for="password">Пароль</label>
+                <div class="password-input">
+                    <input type="password" id="password" name="password">
+                    <button type="button" class="toggle-password">
+                        <i class="far fa-eye-slash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="options">
+                <div class="remember-me">
+                    <input type="checkbox" id="remember">
+                    <label for="remember">Запомнить меня</label>
+                </div>
+                <a href="#" class="forgot-password">Забыл пароль</a>
+            </div>
+
+            <button type="submit" class="login-button">Войти</button>
+        </form>
+
+        <div class="signup-link">
+            <p>Нет аккаунта? <a href="sign-up.html">Зарегистрироваться</a></p>
+        </div>
+    </div>
+    <script src="scripts/signup-base-scripts.js"></script>
+</body>
+</html>
