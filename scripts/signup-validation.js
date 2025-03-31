@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Email validation is handled by browser
-        
+
         // Check password match
         if (inputElement.id === 'confirmPassword') {
             checkPasswordMatch();
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function hasInvalidInput() {
         return (
-            inputList.some(inputElement => !inputElement.validity.valid) || 
+            inputList.some(inputElement => !inputElement.validity.valid) ||
             !checkboxElement.validity.valid
         );
     }
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function toggleErrorSpan(inputElement, errorMessage) {
         const errorElement = document.querySelector(`.${inputElement.id}-error`);
-        
+
         if (errorMessage) {
             inputElement.classList.add('input-error');
             errorElement.textContent = errorMessage;
