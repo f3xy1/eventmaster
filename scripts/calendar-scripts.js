@@ -49,10 +49,46 @@ document.addEventListener('DOMContentLoaded', function() {
         // Calculate days from previous month
         const prevMonthDays = firstDayOfWeek;
         const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+        const prevMonthLastDate = new Date(currentYear, currentMonth, 0);
+        const prevMonth = prevMonthLastDate.getMonth();
+        const prevYear = prevMonthLastDate.getFullYear();
         
         // Add days from previous month
         for (let i = prevMonthDays - 1; i >= 0; i--) {
-            const dayEl = createDayElement(prevMonthLastDay - i, true);
+            const dayNum = prevMonthLastDay - i;
+            const dayEl = createDayElement(dayNum, true);
+            
+            // Create events container div
+            const eventsContainer = document.createElement('div');
+            eventsContainer.classList.add('events-container');
+            dayEl.appendChild(eventsContainer);
+            
+            // Add events for this previous month day
+            const dayEvents = events.filter(event => {
+                const eventDate = new Date(event.date);
+                return eventDate.getDate() === dayNum && 
+                       eventDate.getMonth() === prevMonth && 
+                       eventDate.getFullYear() === prevYear;
+            });
+            
+            dayEvents.forEach(event => {
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('event');
+                eventEl.textContent = event.title;
+                eventEl.dataset.eventIndex = events.indexOf(event);
+                
+                // Add click event to show event details
+                eventEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent day click event
+                    openEventDetails(event);
+                });
+                
+                eventsContainer.appendChild(eventEl);
+            });
+            
+            // Add click event to open modal for adding new event
+            dayEl.addEventListener('click', () => openModal(dayNum, prevMonth, prevYear));
+            
             calendarEl.appendChild(dayEl);
         }
         
@@ -63,6 +99,11 @@ document.addEventListener('DOMContentLoaded', function() {
                            today.getFullYear() === currentYear;
             
             const dayEl = createDayElement(day, false, isToday);
+            
+            // Create events container div
+            const eventsContainer = document.createElement('div');
+            eventsContainer.classList.add('events-container');
+            dayEl.appendChild(eventsContainer);
             
             // Add events for this day
             const dayEvents = events.filter(event => {
@@ -84,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     openEventDetails(event);
                 });
                 
-                dayEl.appendChild(eventEl);
+                eventsContainer.appendChild(eventEl);
             });
             
             // Add click event to open modal for adding new event
@@ -93,15 +134,61 @@ document.addEventListener('DOMContentLoaded', function() {
             calendarEl.appendChild(dayEl);
         }
         
+        // Calculate the number of rows needed for this month
+        const totalDaysShown = prevMonthDays + lastDay.getDate();
+        const rows = Math.ceil(totalDaysShown / 7);
+        
         // Calculate how many days we need from the next month
-        const totalDaysDisplayed = days.length * 5;
-        const nextMonthDays = totalDaysDisplayed - (prevMonthDays + lastDay.getDate());
+        // Ensure we always have the exact number of cells needed for the grid
+        const totalCells = rows * 7;
+        const nextMonthDays = totalCells - totalDaysShown;
+        
+        // Get next month and year
+        const nextMonthFirstDate = new Date(currentYear, currentMonth + 1, 1);
+        const nextMonth = nextMonthFirstDate.getMonth();
+        const nextYear = nextMonthFirstDate.getFullYear();
         
         // Add days from next month
         for (let day = 1; day <= nextMonthDays; day++) {
             const dayEl = createDayElement(day, true);
+            
+            // Create events container div
+            const eventsContainer = document.createElement('div');
+            eventsContainer.classList.add('events-container');
+            dayEl.appendChild(eventsContainer);
+            
+            // Add events for this next month day
+            const dayEvents = events.filter(event => {
+                const eventDate = new Date(event.date);
+                return eventDate.getDate() === day && 
+                       eventDate.getMonth() === nextMonth && 
+                       eventDate.getFullYear() === nextYear;
+            });
+            
+            dayEvents.forEach(event => {
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('event');
+                eventEl.textContent = event.title;
+                eventEl.dataset.eventIndex = events.indexOf(event);
+                
+                // Add click event to show event details
+                eventEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent day click event
+                    openEventDetails(event);
+                });
+                
+                eventsContainer.appendChild(eventEl);
+            });
+            
+            // Add click event to open modal for adding new event
+            dayEl.addEventListener('click', () => openModal(day, nextMonth, nextYear));
+            
             calendarEl.appendChild(dayEl);
         }
+        
+        // Add class to calendar indicating how many rows it has
+        calendarEl.className = 'calendar';
+        calendarEl.classList.add(`calendar-rows-${rows}`);
     }
     
     function createDayElement(day, isInactive, isToday = false) {
@@ -121,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
         dayNumberEl.textContent = day;
         
         dayEl.appendChild(dayNumberEl);
+        
         return dayEl;
     }
     
@@ -146,10 +234,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function openModal(day, month, year) {
         const modal = document.getElementById('modalOverlay');
         const dateInput = document.getElementById('eventDate');
+        const timeInput = document.getElementById('eventTime');
         const titleInput = document.getElementById('eventTitle');
         const descriptionInput = document.getElementById('eventDescription');
         
         // Reset form
+        timeInput.value = '';
         titleInput.value = '';
         descriptionInput.value = '';
         
@@ -164,11 +254,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function openEventDetails(event) {
         const detailsModal = document.getElementById('eventDetailsModal');
         const detailsDate = document.getElementById('detailsDate');
+        const detailsTime = document.getElementById('detailsTime');
         const detailsTitle = document.getElementById('detailsEventTitle');
         const detailsDescription = document.getElementById('detailsDescription');
         
         const eventDate = new Date(event.date);
         detailsDate.textContent = `${eventDate.getDate()}.${eventDate.getMonth() + 1}.${eventDate.getFullYear()}`;
+        detailsTime.textContent = event.time || 'Не указано';
         detailsTitle.textContent = event.title;
         detailsDescription.textContent = event.description || 'Нет описания';
         
@@ -194,6 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Get form values
         const dateValue = document.getElementById('eventDate').value;
+        const timeValue = document.getElementById('eventTime').value;
         const titleValue = document.getElementById('eventTitle').value;
         const descriptionValue = document.getElementById('eventDescription').value;
         
@@ -208,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create new event object
         const newEvent = {
             date: eventDate,
+            time: timeValue,  // Store the time value
             title: titleValue,
             description: descriptionValue
         };

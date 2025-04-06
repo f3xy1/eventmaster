@@ -4,12 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Календарь</title>
+    <link rel="stylesheet" href="css/main-page-style.css">
     <link rel="stylesheet" href="css/calendar-page-style.css">
+    <link rel="stylesheet" href="css/calendar-rows-style.css">
 </head>
 <body>
     <header>
-        <h1>Мой Календарь</h1>
+        <div class="logo"><a class="logo-btn"href="main-page.html">EventMaster</a></div>
+        <nav>
+            <ul>
+                <li><a class="nav-calnendar-btn" href="calendar.html">Организация мероприятия</a></li>
+                <li><a href="#">Пригласить участников</a></li>
+                <li><a class="nav-registration-btn" href="sign-up.html">Регистрация</a></li>
+                <li><a class="nav-login-btn" href="login.html">Вход</a></li>
+            </ul>
+        </nav>
     </header>
+    
     <div class="calendar-container">
         <div class="calendar-header">
             <div class="month-selector">
@@ -33,7 +44,11 @@
                     <input type="text" id="eventDate" readonly>
                 </div>
                 <div class="form-group">
-                    <label>Название мероприятия:</label>
+                    <label>Время:</label>
+                    <input type="time" id="eventTime" required>
+                </div>
+                <div class="form-group">
+                    <label>Название:</label>
                     <input type="text" id="eventTitle" required>
                 </div>
                 <div class="form-group">
@@ -54,6 +69,10 @@
                 <div class="form-group">
                     <label>Дата:</label>
                     <p id="detailsDate"></p>
+                </div>
+                <div class="form-group">
+                    <label>Время:</label>
+                    <p id="detailsTime"></p>
                 </div>
                 <div class="form-group">
                     <label>Название:</label>

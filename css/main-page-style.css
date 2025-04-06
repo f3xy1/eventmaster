@@ -2,7 +2,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Arial', sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
@@ -11,25 +11,25 @@ body {
     line-height: 1.6;
 }
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
+
 
 header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 0;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 5;
+    padding-bottom: 0;
     border-bottom: 1px solid #ddd;
-    margin-bottom: 30px;
+    margin-bottom: 5px;
+    align-items: center;
 }
 
-.logo {
+.logo-btn {
+    margin-right: 100px;
     font-size: 36px;
     font-weight: bold;
     color: #1a237e;
+    text-decoration: none;
 }
 
 nav ul {

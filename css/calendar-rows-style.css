@@ -1,0 +1,14 @@
+.calendar-rows-5 .calendar-day {
+    height: 200px;
+}
+
+.calendar-rows-6 .calendar-day {
+    height: 200px;
+}
+
+@media (max-width: 768px) {
+    .calendar-rows-5 .calendar-day,
+    .calendar-rows-6 .calendar-day {
+        min-height: 80px;
+    }
+}
