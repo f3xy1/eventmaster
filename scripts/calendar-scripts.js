@@ -11,12 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     
-    // Sample events
-    const events = [
-        { date: new Date(currentYear, currentMonth, 15), title: 'Встреча с командой' },
-        { date: new Date(currentYear, currentMonth, 20), title: 'Приём у стоматолога' },
-        { date: new Date(currentYear, currentMonth, 25), title: 'День рождения' }
-    ];
+    // Initialize events from localStorage or create an empty array
+    let events = JSON.parse(localStorage.getItem('calendarEvents')) || [];
     
     // Render the weekday headers once since they're static
     function renderWeekdayHeaders() {
@@ -69,25 +65,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const dayEl = createDayElement(day, false, isToday);
             
             // Add events for this day
-            const dayEvents = events.filter(event => 
-                event.date.getDate() === day && 
-                event.date.getMonth() === currentMonth && 
-                event.date.getFullYear() === currentYear
-            );
+            const dayEvents = events.filter(event => {
+                const eventDate = new Date(event.date);
+                return eventDate.getDate() === day && 
+                       eventDate.getMonth() === currentMonth && 
+                       eventDate.getFullYear() === currentYear;
+            });
             
             dayEvents.forEach(event => {
                 const eventEl = document.createElement('div');
                 eventEl.classList.add('event');
                 eventEl.textContent = event.title;
+                eventEl.dataset.eventIndex = events.indexOf(event);
+                
+                // Add click event to show event details
+                eventEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent day click event
+                    openEventDetails(event);
+                });
+                
                 dayEl.appendChild(eventEl);
             });
+            
+            // Add click event to open modal for adding new event
+            dayEl.addEventListener('click', () => openModal(day, currentMonth, currentYear));
             
             calendarEl.appendChild(dayEl);
         }
         
         // Calculate how many days we need from the next month
-        // Changed from 6 to 5 rows as requested
-        const totalDaysDisplayed = days.length * 5; // 5 rows of days
+        const totalDaysDisplayed = days.length * 5;
         const nextMonthDays = totalDaysDisplayed - (prevMonthDays + lastDay.getDate());
         
         // Add days from next month
@@ -134,6 +141,100 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         renderCalendar();
     });
+    
+    // Modal window functions for event creation
+    function openModal(day, month, year) {
+        const modal = document.getElementById('modalOverlay');
+        const dateInput = document.getElementById('eventDate');
+        const titleInput = document.getElementById('eventTitle');
+        const descriptionInput = document.getElementById('eventDescription');
+        
+        // Reset form
+        titleInput.value = '';
+        descriptionInput.value = '';
+        
+        // Set date value
+        dateInput.value = `${day}.${month + 1}.${year}`;
+        
+        // Display modal
+        modal.style.display = 'flex';
+    }
+    
+    // Event details modal functions
+    function openEventDetails(event) {
+        const detailsModal = document.getElementById('eventDetailsModal');
+        const detailsDate = document.getElementById('detailsDate');
+        const detailsTitle = document.getElementById('detailsEventTitle');
+        const detailsDescription = document.getElementById('detailsDescription');
+        
+        const eventDate = new Date(event.date);
+        detailsDate.textContent = `${eventDate.getDate()}.${eventDate.getMonth() + 1}.${eventDate.getFullYear()}`;
+        detailsTitle.textContent = event.title;
+        detailsDescription.textContent = event.description || 'Нет описания';
+        
+        detailsModal.style.display = 'flex';
+    }
+    
+    // Close modal when clicking on X
+    document.querySelector('.close-btn').addEventListener('click', closeModal);
+    document.querySelector('.close-details').addEventListener('click', closeEventDetails);
+    
+    // Close modals when clicking outside the modal
+    window.addEventListener('click', function(event) {
+        const createModal = document.getElementById('modalOverlay');
+        const detailsModal = document.getElementById('eventDetailsModal');
+        
+        if(event.target === createModal) closeModal();
+        if(event.target === detailsModal) closeEventDetails();
+    });
+    
+    // Form submission handling
+    document.getElementById('registrationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Get form values
+        const dateValue = document.getElementById('eventDate').value;
+        const titleValue = document.getElementById('eventTitle').value;
+        const descriptionValue = document.getElementById('eventDescription').value;
+        
+        // Parse date (format: "DD.MM.YYYY")
+        const dateParts = dateValue.split('.');
+        const eventDate = new Date(
+            parseInt(dateParts[2]), // year
+            parseInt(dateParts[1]) - 1, // month (0-11)
+            parseInt(dateParts[0]) // day
+        );
+        
+        // Create new event object
+        const newEvent = {
+            date: eventDate,
+            title: titleValue,
+            description: descriptionValue
+        };
+        
+        // Add event to events array
+        events.push(newEvent);
+        
+        // Save events to localStorage
+        localStorage.setItem('calendarEvents', JSON.stringify(events));
+        
+        // Re-render calendar to show new event
+        renderCalendar();
+        
+        // Close modal
+        closeModal();
+        
+        // Show confirmation
+        alert('Мероприятие успешно добавлено!');
+    });
+    
+    function closeModal() {
+        document.getElementById('modalOverlay').style.display = 'none';
+    }
+    
+    function closeEventDetails() {
+        document.getElementById('eventDetailsModal').style.display = 'none';
+    }
     
     // Initial render
     renderWeekdayHeaders();
