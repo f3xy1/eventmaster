@@ -117,6 +117,7 @@ input[type="password"] {
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.3s;
+    margin-bottom: 20px;
 }
 
 .login-button:hover {
@@ -135,4 +136,42 @@ input[type="password"] {
 
 .signup-link a:hover {
     text-decoration: underline;
+}
+
+.form-error {
+    display: none;
+    font-size: 14px;
+    color: #e53935;
+    margin-top: 5px;
+    position: relative;
+    padding-left: 20px;
+}
+
+.form-error::before {
+    content: '✕';
+    color: #e53935;
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-weight: bold;
+}
+
+.form-error-active {
+    display: block;
+}
+
+.input-error {
+    border-color: #e53935 !important;
+}
+
+.form-empty-error {
+    color: #e53935;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.login-button-inactive {
+    background-color: #cccccc;
+    cursor: not-allowed;
 }
