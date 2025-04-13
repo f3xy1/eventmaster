@@ -23,13 +23,12 @@ body {
     width: 100%;
 }
 
-
-
 .calendar-header {
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 20px;
+    margin-top: 70px;
 }
 
 .month-selector {
@@ -44,6 +43,12 @@ body {
 }
 
 header {
+    position: fixed;
+    background-color: #f5f7fa;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 1000;
     display: flex;
     gap: 10px;
     justify-content: center;
@@ -102,9 +107,7 @@ header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 10px;
-    /* Set grid auto-rows to help with month size variations */
     grid-auto-rows: minmax(min-content, 1fr);
-    /* Add this to maintain the overall calendar height */
     min-height: 80vh;
 }
 
@@ -161,7 +164,6 @@ header {
     flex-grow: 1;
 }
 
-/* Custom scrollbar styling */
 .events-container::-webkit-scrollbar {
     width: 5px;
 }
@@ -207,7 +209,6 @@ header {
     background-color: #dadada;
 }
 
-/* Modal window styles */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -221,7 +222,6 @@ header {
     z-index: 1000;
 }
 
-/* Modal window styles */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -243,8 +243,8 @@ header {
     max-width: 400px;
     width: 90%;
     position: relative;
-    max-height: 80vh; /* Limit height to 80% of viewport height */
-    overflow-y: auto; /* Add scrolling for content that exceeds the height */
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 @keyframes slideIn {
@@ -252,7 +252,6 @@ header {
     to { transform: translateY(0); opacity: 1; }
 }
 
-/* Add styles for the scrollbar in the modal content */
 .modal-content::-webkit-scrollbar {
     width: 5px;
 }
@@ -278,7 +277,7 @@ header {
     cursor: pointer;
     font-size: 24px;
     color: #4a6fa5;
-    z-index: 1; /* Ensure the close button stays on top */
+    z-index: 1;
 }
 
 .form-group {
@@ -299,8 +298,8 @@ header {
 }
 
 .form-group textarea {
-    resize: vertical; /* Allow vertical resizing but respect max-height of parent */
-    max-height: 300px; /* Limit textarea height */
+    resize: vertical;
+    max-height: 300px;
 }
 
 .form-group p {
@@ -335,7 +334,6 @@ header {
     border-radius: 4px;
 }
 
-/* Added styles to control textarea resizing */
 .form-group textarea {
     resize: vertical;
     max-width: 100%;
@@ -368,10 +366,48 @@ header {
     margin-top: 15px;
 }
 
-/* Styling for event time display */
 #detailsTime {
     font-weight: 500;
     color: #333;
+}
+
+.profile-icon {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #4285f4;
+    position: relative;
+    top: 3px;
+}
+
+.profile-icon::before {
+    content: "";
+    position: absolute;
+    top: 25%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 14px;
+    background-color: #f5f5f5;
+    border-radius: 50%;
+}
+
+.profile-icon::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 8px;
+    background-color: #f5f5f5;
+    border-radius: 10px 10px 0 0;
+    clip-path: polygon(0 100%, 100% 100%, 100% 0, 0 0);
+}
+
+.profile-icon:hover {
+    background-color: #2980b9;
 }
 
 @media (max-width: 768px) {
