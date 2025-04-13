@@ -139,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const rows = Math.ceil(totalDaysShown / 7);
         
         // Calculate how many days we need from the next month
-        // Ensure we always have the exact number of cells needed for the grid
         const totalCells = rows * 7;
         const nextMonthDays = totalCells - totalDaysShown;
         
@@ -237,12 +236,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const timeInput = document.getElementById('eventTime');
         const titleInput = document.getElementById('eventTitle');
         const descriptionInput = document.getElementById('eventDescription');
+        const routeDistance = document.getElementById('routeDistance');
         
         // Reset form
         timeInput.value = '';
         titleInput.value = '';
         descriptionInput.value = '';
         document.getElementById('routeData').value = '';
+        routeDistance.textContent = 'Маршрут не задан';
         
         // Set date value
         dateInput.value = `${day}.${month + 1}.${year}`;
@@ -258,6 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const detailsTime = document.getElementById('detailsTime');
         const detailsTitle = document.getElementById('detailsEventTitle');
         const detailsDescription = document.getElementById('detailsDescription');
+        const detailsRouteDistance = document.getElementById('detailsRouteDistance');
         const routeDetailsContainer = document.getElementById('routeDetailsContainer');
         const detailsRouteData = document.getElementById('detailsRouteData');
         
@@ -266,6 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         detailsTime.textContent = event.time || 'Не указано';
         detailsTitle.textContent = event.title;
         detailsDescription.textContent = event.description || 'Нет описания';
+        detailsRouteDistance.textContent = event.distance ? `${event.distance.toFixed(2)} км` : 'Маршрут не задан';
         
         // Show or hide route details based on whether we have route data
         if (event.routeData) {
@@ -303,6 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const titleValue = document.getElementById('eventTitle').value;
         const descriptionValue = document.getElementById('eventDescription').value;
         const routeDataValue = document.getElementById('routeData').value;
+        const routeDistanceText = document.getElementById('routeDistance').textContent;
         
         // Parse date (format: "DD.MM.YYYY")
         const dateParts = dateValue.split('.');
@@ -312,13 +316,20 @@ document.addEventListener('DOMContentLoaded', function() {
             parseInt(dateParts[0]) // day
         );
         
+        // Parse distance (remove ' км' and convert to number)
+        let distance = null;
+        if (routeDistanceText !== 'Маршрут не задан') {
+            distance = parseFloat(routeDistanceText.replace(' км', ''));
+        }
+        
         // Create new event object
         const newEvent = {
             date: eventDate,
-            time: timeValue,  // Store the time value
+            time: timeValue,
             title: titleValue,
             description: descriptionValue,
-            routeData: routeDataValue // Store the route data
+            routeData: routeDataValue,
+            distance: distance // Store as number or null
         };
         
         // Add event to events array
