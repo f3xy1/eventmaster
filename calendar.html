@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/main-page-style.css">
     <link rel="stylesheet" href="css/calendar-page-style.css">
     <link rel="stylesheet" href="css/calendar-rows-style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
     <header>
@@ -56,6 +57,17 @@
                     <label>Описание:</label>
                     <textarea id="eventDescription" rows="3"></textarea>
                 </div>
+                <div class="form-group">
+                    <label>Маршрут прогулки:</label>
+                    <div id="map-container">
+                        <div id="map"></div>
+                        <div class="map-instructions">
+                            <p>Нажмите на карту, чтобы добавить точки маршрута. Правый клик удаляет точку.</p>
+                            <button type="button" id="resetRouteBtn" class="route-btn">Сбросить маршрут</button>
+                        </div>
+                        <input type="hidden" id="routeData">
+                    </div>
+                </div>
                 <button type="submit" class="form-btn">Добавить</button>
             </form>
         </div>
@@ -83,10 +95,18 @@
                     <label>Описание:</label>
                     <p id="detailsDescription"></p>
                 </div>
+                <div class="form-group" id="routeDetailsContainer">
+                    <label>Маршрут прогулки:</label>
+                    <div id="detailsMap"></div>
+                    <input type="hidden" id="detailsRouteData">
+                </div>
             </div>
         </div>
     </div>
     
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="scripts/calendar-scripts.js"></script>
+    <script src="scripts/route-planner.js"></script>
+    <script src="https://unpkg.com/@mapbox/polyline@1.1.1/src/polyline.js"></script>
 </body>
 </html>

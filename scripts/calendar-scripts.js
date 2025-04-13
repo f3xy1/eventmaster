@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
         timeInput.value = '';
         titleInput.value = '';
         descriptionInput.value = '';
+        document.getElementById('routeData').value = '';
         
         // Set date value
         dateInput.value = `${day}.${month + 1}.${year}`;
@@ -257,12 +258,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const detailsTime = document.getElementById('detailsTime');
         const detailsTitle = document.getElementById('detailsEventTitle');
         const detailsDescription = document.getElementById('detailsDescription');
+        const routeDetailsContainer = document.getElementById('routeDetailsContainer');
+        const detailsRouteData = document.getElementById('detailsRouteData');
         
         const eventDate = new Date(event.date);
         detailsDate.textContent = `${eventDate.getDate()}.${eventDate.getMonth() + 1}.${eventDate.getFullYear()}`;
         detailsTime.textContent = event.time || 'Не указано';
         detailsTitle.textContent = event.title;
         detailsDescription.textContent = event.description || 'Нет описания';
+        
+        // Show or hide route details based on whether we have route data
+        if (event.routeData) {
+            routeDetailsContainer.style.display = 'block';
+            detailsRouteData.value = event.routeData;
+            // The showRouteOnDetailsMap function will be called by the observer in route-planner.js
+        } else {
+            routeDetailsContainer.style.display = 'none';
+            detailsRouteData.value = '';
+        }
         
         detailsModal.style.display = 'flex';
     }
@@ -289,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const timeValue = document.getElementById('eventTime').value;
         const titleValue = document.getElementById('eventTitle').value;
         const descriptionValue = document.getElementById('eventDescription').value;
+        const routeDataValue = document.getElementById('routeData').value;
         
         // Parse date (format: "DD.MM.YYYY")
         const dateParts = dateValue.split('.');
@@ -303,7 +317,8 @@ document.addEventListener('DOMContentLoaded', function() {
             date: eventDate,
             time: timeValue,  // Store the time value
             title: titleValue,
-            description: descriptionValue
+            description: descriptionValue,
+            routeData: routeDataValue // Store the route data
         };
         
         // Add event to events array
