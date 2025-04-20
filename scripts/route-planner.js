@@ -13,8 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initMap() {
         if (map !== null) return; // Don't initialize if already exists
         
-        // Center the map on a default location (Moscow)
-        map = L.map('map').setView([55.7558, 37.6173], 13);
+        map = L.map('map').setView([56.8375, 60.5975], 13);
         
         // Add the OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -229,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
             // Инициализируем карту деталей, если она ещё не создана
             if (!detailsMap) {
-                detailsMap = L.map('detailsMap').setView([55.7558, 37.6173], 13);
+                detailsMap = L.map('detailsMap').setView([56.8375, 60.5975], 13);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(detailsMap);
