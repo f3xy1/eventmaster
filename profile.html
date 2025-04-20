@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/profile-style.css">
+    <title>Profile</title>
+</head>
+<body>
+    <header>
+        <div class="logo"><a class="logo-btn" href="index.html">EventMaster</a></div>
+        <nav>
+            <ul>
+                <li><a href="calendar.html">Организация мероприятия</a></li>
+                <li><a href="#">Пригласить участников</a></li>
+                <li><a href="sign-up.html">Регистрация</a></li>
+                <li><a href="login.html">Вход</a></li>
+                <li><a href="profile.html" class="profile-icon"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+        <img class="profile-pic" src="images/profile-img.svg">
+        <div class="information">
+            <div class="info-container">
+                <p class="name">Имя:</p>
+                <p class="name-from-db">Иван</p>
+            </div>
+            <div class="info-container">
+                <p class="secondname">Фамилия:</p>
+                <p class="secondname-from-db">Иванов</p>
+            </div>
+            <div class="info-container">
+                <p class="email">Почта:</p>
+                <p class="email-from-db">IvanIvanov@email.com</p>
+            </div>
+            <a class="edit-btn">
+                <img src="images/edit.svg" alt="Edit Profile" class="edit-icon">
+            </a>
+        </div>
+        
+        <div class="your-events">
+            <h2>Ваши мероприятия</h2>
+        </div>
+    </div>
+    <script src="scripts/profile.js"></script>
+</body>
+</html>

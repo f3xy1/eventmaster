@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function startValidation() {
         toggleButton();
         
-        form.addEventListener('submit', (event) => {
+        form.addEventListener('submit', async (event) => {
             event.preventDefault();
             if (hasInvalidInput()) {
                 formError();
@@ -22,9 +22,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 toggleInputError(checkboxElement);
             } else {
-                // Form is valid, you can submit it here
-                console.log('Form is valid - submitting');
-                // form.submit();
+                // Отправляем данные на сервер
+                const login = document.getElementById('firstName').value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                try {
+                    const response = await fetch('http://localhost:3000/api/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            login,
+                            password,
+                            email,
+                            name: null,
+                            secondname: null,
+                        }),
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('Пользователь успешно зарегистрирован');
+                        window.location.href = 'login.html'; // Перенаправляем на страницу входа
+                    } else {
+                        formErrorElement.textContent = result.error || 'Ошибка при регистрации';
+                    }
+                } catch (e) {
+                    formErrorElement.textContent = 'Ошибка связи с сервером';
+                    console.error('Ошибка при регистрации:', e);
+                }
             }
         });
 
@@ -43,7 +71,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Special handling for password confirmation
         confirmPasswordInput.addEventListener('input', () => {
             checkPasswordMatch();
             toggleButton();
@@ -62,24 +89,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function checkInputValidity(inputElement) {
-        // Reset custom validity
         inputElement.setCustomValidity('');
         
-        // Check for pattern mismatch
         if (inputElement.validity.patternMismatch) {
             inputElement.setCustomValidity(inputElement.dataset.errorMessage);
             return;
         }
         
-        // Check for length
         if (inputElement.minLength && inputElement.value.trim().length < inputElement.minLength) {
             inputElement.setCustomValidity(`Минимальное количество символов: ${inputElement.minLength}`);
             return;
         }
-        
-        // Email validation is handled by browser
 
-        // Check password match
         if (inputElement.id === 'confirmPassword') {
             checkPasswordMatch();
         }

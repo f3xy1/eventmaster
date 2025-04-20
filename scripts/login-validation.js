@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function startValidation() {
         toggleButton();
         
-        form.addEventListener('submit', (event) => {
+        form.addEventListener('submit', async (event) => {
             event.preventDefault();
             if (hasInvalidInput()) {
                 formError();
@@ -18,9 +18,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     toggleInputError(inputElement);
                 });
             } else {
-                // Form is valid, you can submit it here
-                console.log('Form is valid - submitting');
-                // form.submit();
+                // Отправляем данные на сервер
+                const loginOrEmail = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                try {
+                    const response = await fetch('http://localhost:3000/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            loginOrEmail,
+                            password,
+                        }),
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('Вход выполнен успешно');
+                        alert('Вход выполнен успешно!');
+                    } else {
+                        formErrorElement.textContent = result.error || 'Неверный логин/почта или пароль';
+                    }
+                } catch (e) {
+                    formErrorElement.textContent = 'Ошибка связи с сервером';
+                    console.error('Ошибка при входе:', e);
+                }
             }
         });
 
@@ -41,18 +65,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function checkInputValidity(inputElement) {
-        // Reset custom validity
         inputElement.setCustomValidity('');
         
-        // Check if the field is empty
         if (inputElement.validity.valueMissing) {
             inputElement.setCustomValidity('Это поле обязательно для заполнения');
-            return;
-        }
-        
-        // Specific validation for email field
-        if (inputElement.id === 'email' && inputElement.validity.typeMismatch) {
-            inputElement.setCustomValidity('Пожалуйста, введите корректный адрес почты');
             return;
         }
     }
