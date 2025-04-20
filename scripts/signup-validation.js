@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // Отправляем данные на сервер
                 const login = document.getElementById('firstName').value;
+                const name = document.getElementById('name').value;
+                const secondname = document.getElementById('secondname').value;
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
 
@@ -35,16 +37,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         body: JSON.stringify({
                             login,
-                            password,
+                            name,
+                            secondname,
                             email,
-                            name: null,
-                            secondname: null,
+                            password,
                         }),
                     });
 
                     const result = await response.json();
                     if (result.success) {
                         console.log('Пользователь успешно зарегистрирован');
+                        // Сохраняем userId в localStorage
+                        localStorage.setItem('current_user_id', result.userId);
                         window.location.href = 'login.html'; // Перенаправляем на страницу входа
                     } else {
                         formErrorElement.textContent = result.error || 'Ошибка при регистрации';
@@ -91,6 +95,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkInputValidity(inputElement) {
         inputElement.setCustomValidity('');
         
+        if (inputElement.validity.valueMissing) {
+            inputElement.setCustomValidity('Это поле обязательно для заполнения');
+            return;
+        }
+
         if (inputElement.validity.patternMismatch) {
             inputElement.setCustomValidity(inputElement.dataset.errorMessage);
             return;

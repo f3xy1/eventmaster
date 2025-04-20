@@ -58,6 +58,11 @@
                     <textarea id="eventDescription" rows="3"></textarea>
                 </div>
                 <div class="form-group">
+                    <label>Участники (введите логины через запятую):</label>
+                    <input type="text" id="eventParticipants" placeholder="user1, user2, user3">
+                    <div id="participantsFeedback" class="participants-feedback"></div>
+                </div>
+                <div class="form-group">
                     <label>Маршрут прогулки:</label>
                     <div id="map-container">
                         <div id="map"></div>
@@ -100,6 +105,14 @@
                     <p id="detailsDescription"></p>
                 </div>
                 <div class="form-group">
+                    <label>Организатор:</label>
+                    <p id="detailsCreator"></p>
+                </div>
+                <div class="form-group">
+                    <label>Участники:</label>
+                    <p id="detailsParticipants"></p>
+                </div>
+                <div class="form-group">
                     <label>Длина маршрута:</label>
                     <p id="detailsRouteDistance">Маршрут не задан</p>
                 </div>
@@ -116,5 +129,5 @@
     <script src="scripts/calendar-scripts.js"></script>
     <script src="scripts/route-planner.js"></script>
     <script src="https://unpkg.com/@mapbox/polyline@1.1.1/src/polyline.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92fce8118ac7e58e',t:'MTc0NDU2NzY4Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

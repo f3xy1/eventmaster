@@ -419,6 +419,16 @@ header {
     color: #333;
 }
 
+.participants-feedback {
+    margin-top: 5px;
+}
+
+.participant-error {
+    color: #d32f2f;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
 /* Adjust for mobile devices */
 @media (max-width: 768px) {
     #map, #detailsMap {

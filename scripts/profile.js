@@ -1,4 +1,12 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // Проверяем, авторизован ли пользователь
+    const userId = localStorage.getItem('current_user_id');
+    if (!userId) {
+        alert('Пожалуйста, войдите в аккаунт');
+        window.location.href = 'login.html';
+        return;
+    }
+
     // Get edit button element
     const editBtn = document.querySelector('.edit-btn');
     
@@ -12,6 +20,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorContainer = document.createElement('div');
     errorContainer.className = 'profile-error-container';
     document.querySelector('.information').appendChild(errorContainer);
+
+    // Загружаем данные пользователя с сервера
+    try {
+        const response = await fetch(`http://localhost:3000/api/user/${userId}`);
+        const result = await response.json();
+        if (result.success) {
+            const user = result.user;
+            document.querySelector('.name-from-db').textContent = user.name || 'Не указано';
+            document.querySelector('.secondname-from-db').textContent = user.secondname || 'Не указано';
+            document.querySelector('.email-from-db').textContent = user.email || 'Не указано';
+        } else {
+            throw new Error(result.error || 'Ошибка при загрузке данных пользователя');
+        }
+    } catch (e) {
+        console.error('Ошибка:', e);
+        showError('Не удалось загрузить данные пользователя');
+        return;
+    }
     
     // Function to toggle edit mode
     function toggleEditMode() {
@@ -25,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create input element
                 const input = document.createElement('input');
                 input.type = 'text';
-                input.value = field.textContent;
+                input.value = field.textContent === 'Не указано' ? '' : field.textContent;
                 input.className = 'edit-input';
                 input.dataset.fieldType = field.className.replace('-from-db', '');
                 
@@ -68,20 +94,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    function saveChanges() {
+    async function saveChanges() {
         // Exiting edit mode (saving)
         isEditMode = false;
         
+        const updatedData = {};
         editableFields.forEach(field => {
             const input = field.querySelector('input');
             if (input) {
-                // Update field with input value
-                field.textContent = input.value;
-                
-                // Save to database would happen here
-                console.log(`Saving ${field.className}: ${input.value}`);
+                const fieldType = field.className.replace('-from-db', '');
+                updatedData[fieldType] = input.value.trim() || null;
+                // Update field with input value (временно, до ответа сервера)
+                field.textContent = input.value.trim() || 'Не указано';
             }
         });
+        
+        // Сохраняем изменения на сервере
+        try {
+            const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatedData),
+            });
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'Ошибка при сохранении данных');
+            }
+        } catch (e) {
+            console.error('Ошибка при сохранении:', e);
+            showError(e.message || 'Не удалось сохранить изменения');
+            // Откатываем изменения на странице
+            editableFields.forEach(field => {
+                field.textContent = field.dataset.originalText;
+            });
+            return;
+        }
         
         // Reset edit icon
         editBtn.innerHTML = '<img src="images/edit.svg" alt="Edit Profile" class="edit-icon">';

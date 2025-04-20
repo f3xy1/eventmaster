@@ -29,6 +29,34 @@
                         >
                         <span class="form-error firstName-error" id="firstName-error" aria-live="polite"></span>
                     </div>
+
+                    <div class="form-group">
+                        <label for="name">Имя</label>
+                        <input
+                            type="text"
+                            id="name"
+                            name="name"
+                            pattern="^[a-zA-Zа-яА-ЯЁё]+$"
+                            data-error-message="Разрешены только буквы латиницы и кириллицы"
+                            aria-describedby="name-error"
+                            required
+                        >
+                        <span class="form-error name-error" id="name-error" aria-live="polite"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="secondname">Фамилия</label>
+                        <input
+                            type="text"
+                            id="secondname"
+                            name="secondname"
+                            pattern="^[a-zA-Zа-яА-ЯЁё]+$"
+                            data-error-message="Разрешены только буквы латиницы и кириллицы"
+                            aria-describedby="secondname-error"
+                            required
+                        >
+                        <span class="form-error secondname-error" id="secondname-error" aria-live="polite"></span>
+                    </div>
                     
                     <div class="form-group">
                         <label for="email">Почта</label>

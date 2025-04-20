@@ -37,7 +37,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     const result = await response.json();
                     if (result.success) {
                         console.log('Вход выполнен успешно');
-                        alert('Вход выполнен успешно!');
+                        // Сохраняем userId в localStorage
+                        localStorage.setItem('current_user_id', result.userId);
+                        // Перенаправляем на страницу профиля
+                        window.location.href = 'profile.html';
                     } else {
                         formErrorElement.textContent = result.error || 'Неверный логин/почта или пароль';
                     }
