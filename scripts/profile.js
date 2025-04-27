@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.location.href = 'login.html';
         return;
     }
+    console.log('userId из Local Storage:', userId);
 
     // Get edit button element
     const editBtn = document.querySelector('.edit-btn');
@@ -34,9 +35,102 @@ document.addEventListener('DOMContentLoaded', async function() {
             throw new Error(result.error || 'Ошибка при загрузке данных пользователя');
         }
     } catch (e) {
-        console.error('Ошибка:', e);
+        console.error('Ошибка при загрузке данных пользователя:', e);
         showError('Не удалось загрузить данные пользователя');
         return;
+    }
+
+    // Загружаем мероприятия пользователя
+    const eventsContainer = document.querySelector('.your-events');
+    if (!eventsContainer) {
+        console.error('Контейнер .your-events не найден в DOM');
+        return;
+    }
+    let events = [];
+    try {
+        console.log('Отправляем запрос на получение мероприятий для userId:', userId);
+        const response = await fetch(`http://localhost:3000/api/events/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        console.log('Статус ответа:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+        }
+
+        const text = await response.text();
+        console.log('Тело ответа сервера (сырой текст):', text);
+        if (!text) {
+            throw new Error('Пустой ответ от сервера');
+        }
+
+        const result = JSON.parse(text);
+        console.log('Ответ сервера для мероприятий (parsed JSON):', result);
+
+        if (result.success) {
+            events = result.events || [];
+            console.log('События для рендеринга:', events);
+            renderEvents(events);
+        } else {
+            throw new Error(result.error || 'Ошибка при загрузке мероприятий');
+        }
+    } catch (e) {
+        console.error('Ошибка при загрузке мероприятий:', e);
+        const errorEl = document.createElement('p');
+        errorEl.className = 'events-error';
+        errorEl.textContent = 'Не удалось загрузить мероприятия: ' + e.message;
+        eventsContainer.appendChild(errorEl);
+    }
+
+    // Функция для отображения мероприятий
+    function renderEvents(events) {
+        console.log('Вызываем renderEvents с событиями:', events);
+        if (!Array.isArray(events) || events.length === 0) {
+            const noEventsEl = document.createElement('p');
+            noEventsEl.className = 'no-events';
+            noEventsEl.textContent = 'У вас пока нет мероприятий';
+            eventsContainer.appendChild(noEventsEl);
+            return;
+        }
+
+        events.forEach(event => {
+            try {
+                const eventEl = document.createElement('div');
+                eventEl.className = 'event-card';
+
+                const titleEl = document.createElement('h3');
+                titleEl.className = 'event-title';
+                titleEl.textContent = event.title || 'Без названия';
+                eventEl.appendChild(titleEl);
+
+                const dateEl = document.createElement('p');
+                dateEl.className = 'event-date';
+                const eventDate = new Date(event.date);
+                if (isNaN(eventDate.getTime())) {
+                    throw new Error(`Некорректная дата для события ${event.id}: ${event.date}`);
+                }
+                dateEl.textContent = `Дата: ${eventDate.getDate()}.${eventDate.getMonth() + 1}.${eventDate.getFullYear()}`;
+                eventEl.appendChild(dateEl);
+
+                const timeEl = document.createElement('p');
+                timeEl.className = 'event-time';
+                timeEl.textContent = `Время: ${event.time || 'Не указано'}`;
+                eventEl.appendChild(timeEl);
+
+                const participantsEl = document.createElement('p');
+                participantsEl.className = 'event-participants';
+                const participants = Array.isArray(event.participants) ? event.participants : [];
+                participantsEl.textContent = `Участники: ${participants.length}`;
+                eventEl.appendChild(participantsEl);
+
+                eventsContainer.appendChild(eventEl);
+            } catch (e) {
+                console.error('Ошибка при рендеринге события:', event, e);
+            }
+        });
     }
     
     // Function to toggle edit mode

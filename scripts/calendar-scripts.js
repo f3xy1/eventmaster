@@ -302,7 +302,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Получаем имена и фамилии участников
         let participantNames = [];
-  [];
         if (event.participants && event.participants.length > 0) {
             for (const login of event.participants) {
                 try {
@@ -339,15 +338,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Close modal when clicking on X
     document.querySelector('.close-btn').addEventListener('click', closeModal);
     document.querySelector('.close-details').addEventListener('click', closeEventDetails);
-    
-    // Close modals when clicking outside the modal
-    window.addEventListener('click', function(event) {
-        const createModal = document.getElementById('modalOverlay');
-        const detailsModal = document.getElementById('eventDetailsModal');
-        
-        if(event.target === createModal) closeModal();
-        if(event.target === detailsModal) closeEventDetails();
-    });
     
     // Проверка логина участников и замена на имя и фамилию
     let participantMap = new Map(); // Хранит соответствие логина -> имя и фамилия
@@ -491,7 +481,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     creator = `${name} ${secondname}`.trim() || 'Неизвестный пользователь';
                 }
             } catch (e) {
-                console.error('Ошибка при получении данных пользователя:', e);
+                console.error(' Ide: Ошибка при получении данных пользователя: ', e);
             }
         }
         
@@ -515,7 +505,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     date: isoDate,
                     time: timeValue,
                     creator: creator,
-                    participants: participants, // Сохраняем логины, а не имена
+                    participants: participants,
                     route_data: routeData,
                     distance: distance
                 }),

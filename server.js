@@ -6,7 +6,6 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
 // Подключаемся к базе данных в папке /db
 const dbPath = path.join(__dirname, 'db', 'eventmaster.db');
@@ -264,22 +263,58 @@ app.post('/api/events', (req, res) => {
 // API для получения всех мероприятий пользователя
 app.get('/api/events/:user_id', (req, res) => {
     const userId = req.params.user_id;
+    console.log(`Запрос на получение мероприятий для userId: ${userId}`); // Логируем запрос
     db.all(`
         SELECT * FROM Events
         WHERE user_id = ?
     `, [userId], (err, rows) => {
         if (err) {
+            console.error('Ошибка SQL-запроса:', err.message);
             res.status(500).json({ error: 'Ошибка при получении мероприятий' });
             return;
         }
-        // Парсим JSON-поля
-        const events = rows.map(row => ({
-            ...row,
-            participants: row.participants ? JSON.parse(row.participants) : [],
-            route_data: row.route_data ? JSON.parse(row.route_data) : null
-        }));
+        console.log(`Найдено мероприятий: ${rows.length}`); // Логируем количество найденных записей
+        // Парсим JSON-поля с обработкой ошибок
+        const events = rows.map(row => {
+            let parsedParticipants = [];
+            let parsedRouteData = null;
+
+            try {
+                parsedParticipants = row.participants ? JSON.parse(row.participants) : [];
+                if (!Array.isArray(parsedParticipants)) {
+                    console.warn(`Некорректный формат participants для события ${row.id}:`, row.participants);
+                    parsedParticipants = [];
+                }
+            } catch (e) {
+                console.error(`Ошибка парсинга participants для события ${row.id}:`, e.message);
+                parsedParticipants = [];
+            }
+
+            try {
+                parsedRouteData = row.route_data ? JSON.parse(row.route_data) : null;
+            } catch (e) {
+                console.error(`Ошибка парсинга route_data для события ${row.id}:`, e.message);
+                parsedRouteData = null;
+            }
+
+            return {
+                ...row,
+                participants: parsedParticipants,
+                route_data: parsedRouteData
+            };
+        });
+
+        console.log('Отправляем ответ:', { success: true, events }); // Логируем ответ
         res.json({ success: true, events });
     });
+});
+
+// Статические файлы (перемещено после API-маршрутов)
+app.use(express.static(__dirname));
+
+// Обработчик для несуществующих маршрутов
+app.use((req, res) => {
+    res.status(404).json({ error: 'Маршрут не найден' });
 });
 
 // Запускаем сервер
