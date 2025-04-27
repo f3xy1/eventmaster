@@ -309,6 +309,51 @@ app.get('/api/events/:user_id', (req, res) => {
     });
 });
 
+// API для получения всех мероприятий
+app.get('/api/all-events', (req, res) => {
+    db.all(`
+        SELECT * FROM Events
+        ORDER BY date ASC
+    `, [], (err, rows) => {
+        if (err) {
+            console.error('Ошибка SQL-запроса:', err.message);
+            res.status(500).json({ error: 'Ошибка при получении мероприятий' });
+            return;
+        }
+        // Парсим JSON-поля с обработкой ошибок
+        const events = rows.map(row => {
+            let parsedParticipants = [];
+            let parsedRouteData = null;
+
+            try {
+                parsedParticipants = row.participants ? JSON.parse(row.participants) : [];
+                if (!Array.isArray(parsedParticipants)) {
+                    console.warn(`Некорректный формат participants для события ${row.id}:`, row.participants);
+                    parsedParticipants = [];
+                }
+            } catch (e) {
+                console.error(`Ошибка парсинга participants для события ${row.id}:`, e.message);
+                parsedParticipants = [];
+            }
+
+            try {
+                parsedRouteData = row.route_data ? JSON.parse(row.route_data) : null;
+            } catch (e) {
+                console.error(`Ошибка парсинга route_data для события ${row.id}:`, e.message);
+                parsedRouteData = null;
+            }
+
+            return {
+                ...row,
+                participants: parsedParticipants,
+                route_data: parsedRouteData
+            };
+        });
+
+        res.json({ success: true, events });
+    });
+});
+
 // Статические файлы (перемещено после API-маршрутов)
 app.use(express.static(__dirname));
 
