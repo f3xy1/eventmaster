@@ -260,6 +260,102 @@ app.post('/api/events', (req, res) => {
     });
 });
 
+// API для обновления мероприятия
+app.put('/api/events/:id', (req, res) => {
+    const eventId = req.params.id;
+    const { user_id, title, description, date, time, creator, participants, route_data, distance } = req.body;
+
+    // Проверяем, существует ли пользователь
+    db.get(`SELECT id FROM Users WHERE id = ?`, [user_id], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
+            return;
+        }
+        if (!row) {
+            res.status(404).json({ error: 'Пользователь не найден' });
+            return;
+        }
+
+        // Проверяем, существует ли мероприятие
+        db.get(`SELECT id FROM Events WHERE id = ? AND user_id = ?`, [eventId, user_id], (err, row) => {
+            if (err) {
+                res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
+                return;
+            }
+            if (!row) {
+                res.status(404).json({ error: 'Мероприятие не найдено или вы не являетесь его создателем' });
+                return;
+            }
+
+            const stmt = db.prepare(`
+                UPDATE Events
+                SET title = ?, description = ?, date = ?, time = ?, creator = ?,
+                    participants = ?, route_data = ?, distance = ?
+                WHERE id = ?
+            `);
+            stmt.run(
+                title,
+                description || null,
+                date,
+                time || null,
+                creator,
+                JSON.stringify(participants || []),
+                route_data ? JSON.stringify(route_data) : null,
+                distance || null,
+                eventId,
+                function (err) {
+                    if (err) {
+                        res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
+                    } else {
+                        res.json({ success: true });
+                    }
+                }
+            );
+            stmt.finalize();
+        });
+    });
+});
+
+// API для удаления мероприятия
+app.delete('/api/events/:id', (req, res) => {
+    const eventId = req.params.id;
+    const userId = req.query.user_id; // Получаем user_id из query-параметра
+
+    // Проверяем, существует ли пользователь
+    db.get(`SELECT id FROM Users WHERE id = ?`, [userId], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
+            return;
+        }
+        if (!row) {
+            res.status(404).json({ error: 'Пользователь не найден' });
+            return;
+        }
+
+        // Проверяем, существует ли мероприятие и принадлежит ли оно пользователю
+        db.get(`SELECT id FROM Events WHERE id = ? AND user_id = ?`, [eventId, userId], (err, row) => {
+            if (err) {
+                res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
+                return;
+            }
+            if (!row) {
+                res.status(404).json({ error: 'Мероприятие не найдено или вы не являетесь его создателем' });
+                return;
+            }
+
+            const stmt = db.prepare(`DELETE FROM Events WHERE id = ?`);
+            stmt.run(eventId, function (err) {
+                if (err) {
+                    res.status(500).json({ error: 'Ошибка при удалении мероприятия' });
+                } else {
+                    res.json({ success: true });
+                }
+            });
+            stmt.finalize();
+        });
+    });
+});
+
 // API для получения всех мероприятий пользователя
 app.get('/api/events/:user_id', (req, res) => {
     const userId = req.params.user_id;

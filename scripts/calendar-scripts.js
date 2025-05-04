@@ -283,27 +283,133 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event details modal functions
     async function openEventDetails(event) {
         const detailsModal = document.getElementById('eventDetailsModal');
-        const detailsDate = document.getElementById('detailsDate');
-        const detailsTime = document.getElementById('detailsTime');
-        const detailsTitle = document.getElementById('detailsEventTitle');
-        const detailsDescription = document.getElementById('detailsDescription');
-        const detailsCreator = document.getElementById('detailsCreator');
-        const detailsParticipants = document.getElementById('detailsParticipants');
-        const detailsRouteDistance = document.getElementById('detailsRouteDistance');
-        const routeDetailsContainer = document.getElementById('routeDetailsContainer');
-        const detailsRouteData = document.getElementById('detailsRouteData');
+        const detailsTitle = document.getElementById('detailsTitle');
+        const detailsContent = document.querySelector('.event-details');
         
-        const eventDate = new Date(event.date);
-        detailsDate.textContent = `${eventDate.getDate()}.${eventDate.getMonth() + 1}.${eventDate.getFullYear()}`;
-        detailsTime.textContent = event.time || 'Не указано';
-        detailsTitle.textContent = event.title;
-        detailsDescription.textContent = event.description || 'Нет описания';
-        detailsCreator.textContent = event.creator || 'Неизвестный пользователь';
+        // Switch to view mode
+        await toggleEventDetailsMode('view', event);
+
+        // Set modal title
+        detailsTitle.textContent = 'Информация о мероприятии';
         
-        // Получаем имена и фамилии участников
+        // Display modal
+        detailsModal.style.display = 'flex';
+    }
+    
+    // Toggle between view and edit modes for event details
+    async function toggleEventDetailsMode(mode, event) {
+        const detailsContent = document.querySelector('.event-details');
+        const detailsTitle = document.getElementById('detailsTitle');
+        
+        if (mode === 'view') {
+            // View mode: Show event details
+            const participantNames = await getParticipantNames(event.participants);
+            detailsContent.innerHTML = `
+                <div class="form-group">
+                    <label>Дата:</label>
+                    <p id="detailsDate">${new Date(event.date).getDate()}.${new Date(event.date).getMonth() + 1}.${new Date(event.date).getFullYear()}</p>
+                </div>
+                <div class="form-group">
+                    <label>Время:</label>
+                    <p id="detailsTime">${event.time || 'Не указано'}</p>
+                </div>
+                <div class="form-group">
+                    <label>Название:</label>
+                    <p id="detailsEventTitle">${event.title}</p>
+                </div>
+                <div class="form-group">
+                    <label>Описание:</label>
+                    <p id="detailsDescription">${event.description || 'Нет описания'}</p>
+                </div>
+                <div class="form-group">
+                    <label>Организатор:</label>
+                    <p id="detailsCreator">${event.creator || 'Неизвестный пользователь'}</p>
+                </div>
+                <div class="form-group">
+                    <label>Участники:</label>
+                    <p id="detailsParticipants">${participantNames}</p>
+                </div>
+                <div class="form-group">
+                    <label>Длина маршрута:</label>
+                    <p id="detailsRouteDistance">${event.distance ? event.distance.toFixed(2) + ' км' : 'Маршрут не задан'}</p>
+                </div>
+                <div class="form-group" id="routeDetailsContainer" style="${event.route_data ? 'display: block' : 'display: none'}">
+                    <label>Маршрут прогулки:</label>
+                    <div id="detailsMap"></div>
+                    <input type="hidden" id="detailsRouteData" value='${event.route_data ? JSON.stringify(event.route_data) : ''}'>
+                </div>
+                <div class="form-group action-buttons">
+                    <button id="editEventBtn" class="form-btn edit-btn">Редактировать</button>
+                    <button id="deleteEventBtn" class="form-btn delete-btn">Удалить</button>
+                </div>
+            `;
+            
+            // Add event listeners for buttons
+            document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
+            document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
+        } else {
+            // Edit mode: Show form for editing
+            const participantLogins = await getParticipantNames(event.participants, true);
+            detailsTitle.textContent = 'Редактирование мероприятия';
+            detailsContent.innerHTML = `
+                <form id="editEventForm">
+                    <div class="form-group">
+                        <label>Дата:</label>
+                        <input type="text" id="editEventDate" value="${new Date(event.date).getDate()}.${new Date(event.date).getMonth() + 1}.${new Date(event.date).getFullYear()}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Время:</label>
+                        <input type="time" id="editEventTime" value="${event.time || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Название:</label>
+                        <input type="text" id="editEventTitle" value="${event.title}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Описание:</label>
+                        <textarea id="editEventDescription" rows="3">${event.description || ''}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Участники (введите логины через запятую):</label>
+                        <input type="text" id="editEventParticipants" value="${participantLogins}" placeholder="user1, user2, user3">
+                        <div id="editParticipantsFeedback" class="participants-feedback"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Маршрут прогулки:</label>
+                        <div id="editMapContainer">
+                            <div id="editMap"></div>
+                            <div class="map-instructions">
+                                <p>Нажмите на карту, чтобы добавить точки маршрута. Правый клик удаляет точку.</p>
+                                <button type="button" id="resetEditRouteBtn" class="route-btn">Сбросить маршрут</button>
+                            </div>
+                            <input type="hidden" id="editRouteData" value='${event.route_data ? JSON.stringify(event.route_data) : ''}'>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Длина маршрута:</label>
+                        <p id="editRouteDistance">${event.distance ? event.distance.toFixed(2) + ' км' : 'Маршрут не задан'}</p>
+                    </div>
+                    <div class="form-group action-buttons">
+                        <button type="submit" class="form-btn save-btn">Сохранить</button>
+                        <button type="button" id="cancelEditBtn" class="form-btn cancel-btn">Отмена</button>
+                    </div>
+                </form>
+            `;
+            
+            // Add event listeners
+            document.getElementById('cancelEditBtn').addEventListener('click', () => toggleEventDetailsMode('view', event));
+            document.getElementById('editEventForm').addEventListener('submit', (e) => handleEditFormSubmit(e, event));
+            document.getElementById('editEventParticipants').addEventListener('input', handleParticipantsInput);
+            // Initialize map for editing
+            initializeEditMap(event.route_data);
+        }
+    }
+    
+    // Get participant names for display
+    async function getParticipantNames(participants, returnLogins = false) {
         let participantNames = [];
-        if (event.participants && event.participants.length > 0) {
-            for (const login of event.participants) {
+        if (participants && participants.length > 0) {
+            for (const login of participants) {
                 try {
                     const response = await fetch(`http://localhost:3000/api/check-user-login/${login}`);
                     const result = await response.json();
@@ -311,39 +417,23 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const name = result.user.name || '';
                         const secondname = result.user.secondname || '';
                         const fullName = `${name} ${secondname}`.trim() || login;
-                        participantNames.push(fullName);
+                        participantNames.push(returnLogins ? login : fullName);
                     } else {
                         participantNames.push(login);
                     }
                 } catch (err) {
+                    console.error(`Ошибка при получении данных для логина ${login}:`, err);
                     participantNames.push(login);
                 }
             }
         }
-        detailsParticipants.textContent = participantNames.length > 0 ? participantNames.join(', ') : 'Нет участников';
-        detailsRouteDistance.textContent = event.distance ? `${event.distance.toFixed(2)} км` : 'Маршрут не задан';
-        
-        // Show or hide route details based on whether we have route data
-        if (event.route_data) {
-            routeDetailsContainer.style.display = 'block';
-            detailsRouteData.value = JSON.stringify(event.route_data);
-        } else {
-            routeDetailsContainer.style.display = 'none';
-            detailsRouteData.value = '';
-        }
-        
-        detailsModal.style.display = 'flex';
+        return participantNames.length > 0 ? participantNames.join(', ') : (returnLogins ? '' : 'Нет участников');
     }
     
-    // Close modal when clicking on X
-    document.querySelector('.close-btn').addEventListener('click', closeModal);
-    document.querySelector('.close-details').addEventListener('click', closeEventDetails);
+    // Handle participants input for edit form
+    let participantMap = new Map();
+    let lastInputValue = '';
     
-    // Проверка логина участников и замена на имя и фамилию
-    let participantMap = new Map(); // Хранит соответствие логина -> имя и фамилия
-    let lastInputValue = ''; // Для отслеживания изменений в поле
-
-    // Функция debounce для ограничения частоты запросов
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -355,22 +445,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             timeout = setTimeout(later, wait);
         };
     }
-
-    const checkParticipants = debounce(async function(participantsInput) {
-        const participantsFeedback = document.getElementById('participantsFeedback');
-        participantsFeedback.innerHTML = '';
-        
-        // Сохраняем позицию курсора
+    
+    const checkParticipants = debounce(async function(participantsInput, feedbackElement) {
+        feedbackElement.innerHTML = '';
         const cursorPosition = participantsInput.selectionStart;
         const previousValueLength = participantsInput.value.length;
         
         const participants = participantsInput.value.split(',').map(p => p.trim()).filter(p => p !== '');
         if (participants.length === 0) return;
-
-        // Обрабатываем только последнего участника
-        const lastParticipant = participants[participants.length - 1];
         
-        // Пропускаем, если это уже преобразованное имя и фамилия
+        const lastParticipant = participants[participants.length - 1];
         if (participantMap.has([...participantMap.entries()].find(([_, fullName]) => fullName === lastParticipant)?.[0])) {
             return;
         }
@@ -385,14 +469,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const fullName = `${name} ${secondname}`.trim() || lastParticipant;
                 participantMap.set(lastParticipant, fullName);
                 
-                // Обновляем только последнего участника в строке
                 participants[participants.length - 1] = fullName;
                 const newValue = participants.join(', ');
                 
                 if (participantsInput.value !== newValue) {
                     participantsInput.value = newValue;
-                    
-                    // Корректируем позицию курсора
                     const newLength = newValue.length;
                     const lengthDiff = newLength - previousValueLength;
                     const newCursorPosition = cursorPosition + lengthDiff;
@@ -402,25 +483,187 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const feedbackItem = document.createElement('div');
                 feedbackItem.classList.add('participant-error');
                 feedbackItem.innerHTML = `✖ ${result.error}`;
-                participantsFeedback.appendChild(feedbackItem);
+                feedbackElement.appendChild(feedbackItem);
             }
         } catch (err) {
             const feedbackItem = document.createElement('div');
             feedbackItem.classList.add('participant-error');
             feedbackItem.innerHTML = `✖ Ошибка проверки логина ${lastParticipant}`;
-            participantsFeedback.appendChild(feedbackItem);
+            feedbackElement.appendChild(feedbackItem);
         }
     }, 300);
-
-    document.getElementById('eventParticipants').addEventListener('input', function(e) {
+    
+    function handleParticipantsInput(e) {
         const participantsInput = e.target;
+        const feedbackElement = document.getElementById(participantsInput.id === 'eventParticipants' ? 'participantsFeedback' : 'editParticipantsFeedback');
         if (participantsInput.value !== lastInputValue) {
             lastInputValue = participantsInput.value;
-            checkParticipants(participantsInput);
+            checkParticipants(participantsInput, feedbackElement);
         }
-    });
+    }
     
-    // Form submission handling
+    document.getElementById('eventParticipants').addEventListener('input', handleParticipantsInput);
+    
+    // Handle edit form submission
+    async function handleEditFormSubmit(e, event) {
+        e.preventDefault();
+        
+        const dateValue = document.getElementById('editEventDate').value;
+        const timeValue = document.getElementById('editEventTime').value;
+        const titleValue = document.getElementById('editEventTitle').value;
+        const descriptionValue = document.getElementById('editEventDescription').value;
+        const participantsValue = document.getElementById('editEventParticipants').value;
+        const routeDataValue = document.getElementById('editRouteData').value;
+        const routeDistanceText = document.getElementById('editRouteDistance').textContent;
+        
+        const dateParts = dateValue.split('.');
+        const year = parseInt(dateParts[2]);
+        const month = parseInt(dateParts[1]) - 1;
+        const day = parseInt(dateParts[0]);
+        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        let distance = null;
+        if (routeDistanceText !== 'Маршрут не задан') {
+            distance = parseFloat(routeDistanceText.replace(' км', ''));
+        }
+        
+        const participants = participantsValue.split(',').map(p => {
+            for (let [login, fullName] of participantMap.entries()) {
+                if (fullName === p.trim()) {
+                    return login;
+                }
+            }
+            return p.trim();
+        }).filter(p => p !== '');
+        
+        if (participants.length > 0) {
+            const invalidParticipants = participants.filter(p => !participantMap.has(p));
+            if (invalidParticipants.length > 0) {
+                alert('Пожалуйста, исправьте ошибки в списке участников перед сохранением.');
+                return;
+            }
+        }
+        
+        let creator = 'Неизвестный пользователь';
+        const userId = localStorage.getItem('current_user_id');
+        if (userId) {
+            try {
+                const response = await fetch(`http://localhost:3000/api/user/${userId}`);
+                const result = await response.json();
+                if (result.success) {
+                    const name = result.user.name || '';
+                    const secondname = result.user.secondname || '';
+                    creator = `${name} ${secondname}`.trim() || 'Неизвестный пользователь';
+                }
+            } catch (e) {
+                console.error('Ошибка при получении данных пользователя:', e);
+            }
+        }
+        
+        let routeData = null;
+        if (routeDataValue && routeDataValue !== '') {
+            try {
+                routeData = JSON.parse(routeDataValue);
+            } catch (e) {
+                console.error('Ошибка при парсинге routeData:', e);
+                alert('Ошибка в данных маршрута.');
+                return;
+            }
+        }
+        
+        try {
+            const response = await fetch(`http://localhost:3000/api/events/${event.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    title: titleValue,
+                    description: descriptionValue,
+                    date: isoDate,
+                    time: timeValue,
+                    creator: creator,
+                    participants: participants,
+                    route_data: routeData,
+                    distance: distance
+                }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`);
+                const eventResult = await eventResponse.json();
+                if (eventResult.success) {
+                    events = eventResult.events.map(event => ({
+                        ...event,
+                        date: new Date(event.date)
+                    }));
+                    renderCalendar();
+                    closeEventDetails();
+                    alert('Мероприятие успешно обновлено!');
+                } else {
+                    throw new Error('Не удалось обновить список мероприятий');
+                }
+            } else {
+                throw new Error(result.error || 'Ошибка при обновлении мероприятия');
+            }
+        } catch (e) {
+            console.error('Ошибка при обновлении мероприятия:', e);
+            alert('Ошибка при обновлении мероприятия: ' + e.message);
+        }
+    }
+    
+    // Handle event deletion
+    async function deleteEvent(eventId) {
+        if (!confirm('Вы уверены, что хотите удалить это мероприятие?')) {
+            return;
+        }
+        
+        const userId = localStorage.getItem('current_user_id');
+        try {
+            const response = await fetch(`http://localhost:3000/api/events/${eventId}?user_id=${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`);
+                const eventResult = await eventResponse.json();
+                if (eventResult.success) {
+                    events = eventResult.events.map(event => ({
+                        ...event,
+                        date: new Date(event.date)
+                    }));
+                    renderCalendar();
+                    closeEventDetails();
+                    alert('Мероприятие успешно удалено!');
+                } else {
+                    throw new Error('Не удалось обновить список мероприятий');
+                }
+            } else {
+                throw new Error(result.error || 'Ошибка при удалении мероприятия');
+            }
+        } catch (e) {
+            console.error('Ошибка при удалении мероприятия:', e);
+            alert('Ошибка при удалении мероприятия: ' + e.message);
+        }
+    }
+    
+    // Initialize map for editing
+    function initializeEditMap(routeData) {
+        // Use routePlanner to initialize the edit map
+        window.routePlanner.initMap('editMap', 'edit', routeData);
+    }
+    
+    // Close modal when clicking on X
+    document.querySelector('.close-btn').addEventListener('click', closeModal);
+    document.querySelector('.close-details').addEventListener('click', closeEventDetails);
+    
+    // Form submission handling for creation
     document.getElementById('registrationForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -438,19 +681,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         const year = parseInt(dateParts[2]);
         const month = parseInt(dateParts[1]) - 1; // month (0-11)
         const day = parseInt(dateParts[0]);
-        // Создаем дату без учета часового пояса
-        const eventDate = new Date(Date.UTC(year, month, day));
-        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; // Формат "YYYY-MM-DD"
+        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // Parse distance (remove ' км' and convert to number)
+        // Parse distance
         let distance = null;
         if (routeDistanceText !== 'Маршрут не задан') {
             distance = parseFloat(routeDistanceText.replace(' км', ''));
         }
         
-        // Parse participants (split by comma and trim whitespace)
+        // Parse participants
         const participants = participantsValue.split(',').map(p => {
-            // Ищем исходный логин по имени и фамилии
             for (let [login, fullName] of participantMap.entries()) {
                 if (fullName === p.trim()) {
                     return login;
@@ -459,7 +699,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return p.trim();
         }).filter(p => p !== '');
         
-        // Проверяем, что все участники валидны (если они есть)
         if (participants.length > 0) {
             const invalidParticipants = participants.filter(p => !participantMap.has(p));
             if (invalidParticipants.length > 0) {
@@ -468,7 +707,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
         
-        // Get creator (current user's name and secondname)
+        // Get creator
         let creator = 'Неизвестный пользователь';
         const userId = localStorage.getItem('current_user_id');
         if (userId) {
@@ -481,7 +720,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     creator = `${name} ${secondname}`.trim() || 'Неизвестный пользователь';
                 }
             } catch (e) {
-                console.error(' Ide: Ошибка при получении данных пользователя: ', e);
+                console.error('Ошибка при получении данных пользователя:', e);
             }
         }
         
