@@ -18,8 +18,10 @@
   "homepage": "https://github.com/f3xy1/eventmaster#readme",
   "description": "",
   "dependencies": {
+    "connect-sqlite3": "^0.9.15",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "express-session": "^1.18.1",
     "sqlite3": "^5.1.7"
   }
 }

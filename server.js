@@ -2,12 +2,43 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
+const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
-app.use(cors());
+
+// Configure CORS to allow multiple origins
+const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:5500'];
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 app.use(express.json());
 
-// Подключаемся к базе данных в папке /db
+// Configure session middleware
+app.use(session({
+    store: new SQLiteStore({
+        db: 'eventmaster.db',
+        dir: path.join(__dirname, 'db'),
+        table: 'Sessions'
+    }),
+    secret: 'your-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000
+    }
+}));
+
+// Connect to the database
 const dbPath = path.join(__dirname, 'db', 'eventmaster.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
@@ -17,9 +48,20 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
-// Создаем таблицы и проверяем структуру
+// Create tables and check structure
 db.serialize(() => {
-    // Создаем таблицу Users, если она не существует
+    db.run(`
+        CREATE TABLE IF NOT EXISTS Sessions (
+            sid TEXT PRIMARY KEY,
+            expires INTEGER,
+            data TEXT
+        )
+    `, (err) => {
+        if (err) {
+            console.error('Ошибка при создании таблицы Sessions:', err.message);
+        }
+    });
+
     db.run(`
         CREATE TABLE IF NOT EXISTS Users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +77,6 @@ db.serialize(() => {
         }
     });
 
-    // Проверяем, есть ли столбцы name и secondname, и добавляем их, если отсутствуют
     db.all("PRAGMA table_info(Users)", (err, columns) => {
         if (err) {
             console.error('Ошибка при проверке структуры таблицы Users:', err.message);
@@ -59,7 +100,6 @@ db.serialize(() => {
         }
     });
 
-    // Создаем таблицу Events, если она не существует
     db.run(`
         CREATE TABLE IF NOT EXISTS Events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +120,14 @@ db.serialize(() => {
         }
     });
 });
+
+// Middleware to check if user is authenticated
+function isAuthenticated(req, res, next) {
+    if (req.session.userId) {
+        return next();
+    }
+    res.status(401).json({ error: 'Не авторизован' });
+}
 
 // API для регистрации пользователя
 app.post('/api/register', (req, res) => {
@@ -110,6 +158,8 @@ app.post('/api/register', (req, res) => {
                 if (err) {
                     res.status(500).json({ error: 'Ошибка при регистрации пользователя' });
                 } else {
+                    req.session.userId = this.lastID;
+                    req.session.login = login;
                     res.json({ success: true, userId: this.lastID });
                 }
             });
@@ -128,6 +178,8 @@ app.post('/api/login', (req, res) => {
         if (err) {
             res.status(500).json({ error: 'Ошибка при проверке пользователя' });
         } else if (row) {
+            req.session.userId = row.id;
+            req.session.login = row.login;
             res.json({ success: true, userId: row.id, login: row.login });
         } else {
             res.status(401).json({ error: 'Неверный логин/почта или пароль' });
@@ -135,9 +187,32 @@ app.post('/api/login', (req, res) => {
     });
 });
 
+// API для выхода пользователя
+app.post('/api/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            res.status(500).json({ error: 'Ошибка при выходе' });
+        } else {
+            res.json({ success: true });
+        }
+    });
+});
+
+// API для проверки сессии
+app.get('/api/check-session', (req, res) => {
+    if (req.session.userId) {
+        res.json({ success: true, userId: req.session.userId, login: req.session.login });
+    } else {
+        res.status(401).json({ error: 'Сессия не найдена' });
+    }
+});
+
 // API для получения данных пользователя
-app.get('/api/user/:id', (req, res) => {
+app.get('/api/user/:id', isAuthenticated, (req, res) => {
     const userId = req.params.id;
+    if (parseInt(userId) !== req.session.userId) {
+        return res.status(403).json({ error: 'Доступ запрещен' });
+    }
     db.get(`
         SELECT * FROM Users
         WHERE id = ?
@@ -161,7 +236,7 @@ app.get('/api/user/:id', (req, res) => {
 });
 
 // API для проверки существования пользователя по логину
-app.get('/api/check-user-login/:login', (req, res) => {
+app.get('/api/check-user-login/:login', isAuthenticated, (req, res) => {
     const login = req.params.login;
     db.get(`
         SELECT * FROM Users
@@ -185,8 +260,11 @@ app.get('/api/check-user-login/:login', (req, res) => {
 });
 
 // API для обновления профиля пользователя
-app.put('/api/user/:id', (req, res) => {
+app.put('/api/user/:id', isAuthenticated, (req, res) => {
     const userId = req.params.id;
+    if (parseInt(userId) !== req.session.userId) {
+        return res.status(403).json({ error: 'Доступ запрещен' });
+    }
     const { name, secondname, email } = req.body;
 
     db.get(
@@ -220,26 +298,60 @@ app.put('/api/user/:id', (req, res) => {
 });
 
 // API для создания мероприятия
-app.post('/api/events', (req, res) => {
-    const { user_id, title, description, date, time, creator, participants, route_data, distance } = req.body;
+app.post('/api/events', isAuthenticated, (req, res) => {
+    const { title, description, date, time, creator, participants, route_data, distance } = req.body;
+    const user_id = req.session.userId;
 
-    // Проверяем, существует ли пользователь
-    db.get(`SELECT id FROM Users WHERE id = ?`, [user_id], (err, row) => {
+    const stmt = db.prepare(`
+        INSERT INTO Events (user_id, title, description, date, time, creator, participants, route_data, distance)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+        user_id,
+        title,
+        description || null,
+        date,
+        time || null,
+        creator,
+        JSON.stringify(participants || []),
+        route_data ? JSON.stringify(route_data) : null,
+        distance || null,
+        function (err) {
+            if (err) {
+                res.status(500).json({ error: 'Ошибка при создании мероприятия' });
+            } else {
+                res.json({ success: true, eventId: this.lastID });
+            }
+        }
+    );
+    stmt.finalize();
+});
+
+// API для обновления мероприятия
+app.put('/api/events/:id', isAuthenticated, (req, res) => {
+    const eventId = req.params.id;
+    const user_id = req.session.userId;
+    const { title, description, date, time, creator, participants, route_data, distance } = req.body;
+
+    db.get(`SELECT id, user_id FROM Events WHERE id = ? AND user_id = ?`, [eventId, user_id], (err, row) => {
         if (err) {
-            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
+            console.error('Ошибка при проверке мероприятия:', err.message);
+            res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
             return;
         }
         if (!row) {
-            res.status(404).json({ error: 'Пользователь не найден' });
+            console.warn(`Попытка редактирования мероприятия ${eventId} пользователем ${user_id}, не являющимся создателем`);
+            res.status(403).json({ error: 'Только создатель мероприятия может его редактировать' });
             return;
         }
 
         const stmt = db.prepare(`
-            INSERT INTO Events (user_id, title, description, date, time, creator, participants, route_data, distance)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            UPDATE Events
+            SET title = ?, description = ?, date = ?, time = ?, creator = ?,
+                participants = ?, route_data = ?, distance = ?
+            WHERE id = ?
         `);
         stmt.run(
-            user_id,
             title,
             description || null,
             date,
@@ -248,11 +360,13 @@ app.post('/api/events', (req, res) => {
             JSON.stringify(participants || []),
             route_data ? JSON.stringify(route_data) : null,
             distance || null,
+            eventId,
             function (err) {
                 if (err) {
-                    res.status(500).json({ error: 'Ошибка при создании мероприятия' });
+                    console.error('Ошибка при обновлении мероприятия:', err.message);
+                    res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
                 } else {
-                    res.json({ success: true, eventId: this.lastID });
+                    res.json({ success: true });
                 }
             }
         );
@@ -260,177 +374,101 @@ app.post('/api/events', (req, res) => {
     });
 });
 
-// API для обновления мероприятия
-app.put('/api/events/:id', (req, res) => {
+// API для присоединения к мероприятию
+app.post('/api/events/:id/join', isAuthenticated, (req, res) => {
     const eventId = req.params.id;
-    const { user_id, title, description, date, time, creator, participants, route_data, distance } = req.body;
+    const login = req.session.login;
 
-    // Проверяем, существует ли пользователь
-    db.get(`SELECT id FROM Users WHERE id = ?`, [user_id], (err, row) => {
+    db.get(`SELECT participants FROM Events WHERE id = ?`, [eventId], (err, row) => {
         if (err) {
-            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
+            console.error('Ошибка при проверке мероприятия:', err.message);
+            res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
             return;
         }
         if (!row) {
-            res.status(404).json({ error: 'Пользователь не найден' });
+            res.status(404).json({ error: 'Мероприятие не найдено' });
             return;
         }
 
-        // Проверяем, существует ли мероприятие и принадлежит ли оно пользователю
-        db.get(`SELECT id FROM Events WHERE id = ? AND user_id = ?`, [eventId, user_id], (err, row) => {
-            if (err) {
-                res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
-                return;
-            }
-            if (!row) {
-                res.status(404).json({ error: 'Мероприятие не найдено или вы не являетесь его создателем' });
-                return;
-            }
-
-            const stmt = db.prepare(`
-                UPDATE Events
-                SET title = ?, description = ?, date = ?, time = ?, creator = ?,
-                    participants = ?, route_data = ?, distance = ?
-                WHERE id = ?
-            `);
-            stmt.run(
-                title,
-                description || null,
-                date,
-                time || null,
-                creator,
-                JSON.stringify(participants || []),
-                route_data ? JSON.stringify(route_data) : null,
-                distance || null,
-                eventId,
-                function (err) {
-                    if (err) {
-                        res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
-                    } else {
-                        res.json({ success: true });
-                    }
-                }
-            );
-            stmt.finalize();
-        });
-    });
-});
-
-// API для присоединения к мероприятию
-app.post('/api/events/:id/join', (req, res) => {
-    const eventId = req.params.id;
-    const { login } = req.body;
-
-    // Проверяем, существует ли пользователь
-    db.get(`SELECT id, login FROM Users WHERE login = ?`, [login], (err, user) => {
-        if (err) {
-            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
-            return;
-        }
-        if (!user) {
-            res.status(404).json({ error: 'Пользователь не найден' });
-            return;
-        }
-
-        // Проверяем, существует ли мероприятие
-        db.get(`SELECT participants FROM Events WHERE id = ?`, [eventId], (err, row) => {
-            if (err) {
-                res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
-                return;
-            }
-            if (!row) {
-                res.status(404).json({ error: 'Мероприятие не найдено' });
-                return;
-            }
-
-            // Парсим текущий список участников
-            let participants = [];
-            try {
-                participants = row.participants ? JSON.parse(row.participants) : [];
-                if (!Array.isArray(participants)) {
-                    console.warn(`Некорректный формат participants для события ${eventId}:`, row.participants);
-                    participants = [];
-                }
-            } catch (e) {
-                console.error(`Ошибка парсинга participants для события ${eventId}:`, e.message);
+        let participants = [];
+        try {
+            participants = row.participants ? JSON.parse(row.participants) : [];
+            if (!Array.isArray(participants)) {
+                console.warn(`Некорректный формат participants для события ${eventId}:`, row.participants);
                 participants = [];
             }
+        } catch (e) {
+            console.error(`Ошибка парсинга participants для события ${eventId}:`, e.message);
+            participants = [];
+        }
 
-            // Проверяем, не является ли пользователь уже участником
-            if (participants.includes(login)) {
-                res.status(400).json({ error: 'Вы уже участвуете в этом мероприятии' });
-                return;
+        if (participants.includes(login)) {
+            res.status(400).json({ error: 'Вы уже участвуете в этом мероприятии' });
+            return;
+        }
+
+        participants.push(login);
+
+        const stmt = db.prepare(`UPDATE Events SET participants = ? WHERE id = ?`);
+        stmt.run(JSON.stringify(participants), eventId, function (err) {
+            if (err) {
+                console.error('Ошибка при обновлении мероприятия:', err.message);
+                res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
+            } else {
+                res.json({ success: true, participants });
             }
-
-            // Добавляем пользователя в список участников
-            participants.push(login);
-
-            // Обновляем мероприятие
-            const stmt = db.prepare(`UPDATE Events SET participants = ? WHERE id = ?`);
-            stmt.run(JSON.stringify(participants), eventId, function (err) {
-                if (err) {
-                    res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
-                } else {
-                    res.json({ success: true, participants });
-                }
-            });
-            stmt.finalize();
         });
+        stmt.finalize();
     });
 });
 
 // API для удаления мероприятия
-app.delete('/api/events/:id', (req, res) => {
+app.delete('/api/events/:id', isAuthenticated, (req, res) => {
     const eventId = req.params.id;
-    const userId = req.query.user_id; // Получаем user_id из query-параметра
+    const userId = req.session.userId;
 
-    // Проверяем, существует ли пользователь
-    db.get(`SELECT id FROM Users WHERE id = ?`, [userId], (err, row) => {
+    db.get(`SELECT id, user_id FROM Events WHERE id = ? AND user_id = ?`, [eventId, userId], (err, row) => {
         if (err) {
-            res.status(500).json({ error: 'Ошибка при проверке пользователя' });
+            console.error('Ошибка при проверке мероприятия:', err.message);
+            res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
             return;
         }
         if (!row) {
-            res.status(404).json({ error: 'Пользователь не найден' });
+            console.warn(`Попытка удаления мероприятия ${eventId} пользователем ${userId}, не являющимся создателем`);
+            res.status(403).json({ error: 'Только создатель мероприятия может его удалить' });
             return;
         }
 
-        // Проверяем, существует ли мероприятие и принадлежит ли оно пользователю
-        db.get(`SELECT id FROM Events WHERE id = ? AND user_id = ?`, [eventId, userId], (err, row) => {
+        const stmt = db.prepare(`DELETE FROM Events WHERE id = ?`);
+        stmt.run(eventId, function (err) {
             if (err) {
-                res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
-            } else if (!row) {
-                res.status(404).json({ error: 'Мероприятие не найдено или вы не являетесь его создателем' });
+                console.error('Ошибка при удалении мероприятия:', err.message);
+                res.status(500).json({ error: 'Ошибка при удалении мероприятия' });
             } else {
-                const stmt = db.prepare(`DELETE FROM Events WHERE id = ?`);
-                stmt.run(eventId, function (err) {
-                    if (err) {
-                        res.status(500).json({ error: 'Ошибка при удалении мероприятия' });
-                    } else {
-                        res.json({ success: true });
-                    }
-                });
-                stmt.finalize();
+                res.json({ success: true });
             }
         });
+        stmt.finalize();
     });
 });
 
 // API для получения всех мероприятий пользователя
-app.get('/api/events/:user_id', (req, res) => {
+app.get('/api/events/:user_id', isAuthenticated, (req, res) => {
     const userId = req.params.user_id;
-    console.log(`Запрос на получение мероприятий для userId: ${userId}`); // Логируем запрос
+    if (parseInt(userId) !== req.session.userId) {
+        return res.status(403).json({ error: 'Доступ запрещен' });
+    }
+    console.log(`Запрос на получение мероприятий для userId: ${userId}`);
     db.all(`
         SELECT * FROM Events
-        WHERE user_id = ?
-    `, [userId], (err, rows) => {
+        WHERE user_id = ? OR participants LIKE ?
+    `, [userId, `%${req.session.login}%`], (err, rows) => {
         if (err) {
             console.error('Ошибка SQL-запроса:', err.message);
             res.status(500).json({ error: 'Ошибка при получении мероприятий' });
             return;
         }
-        console.log(`Найдено мероприятий: ${rows.length}`); // Логируем количество найденных записей
-        // Парсим JSON-поля с обработкой ошибок
+        console.log(`Найдено мероприятий: ${rows.length}`);
         const events = rows.map(row => {
             let parsedParticipants = [];
             let parsedRouteData = null;
@@ -460,7 +498,7 @@ app.get('/api/events/:user_id', (req, res) => {
             };
         });
 
-        console.log('Отправляем ответ:', { success: true, events }); // Логируем ответ
+        console.log('Отправляем ответ:', { success: true, events });
         res.json({ success: true, events });
     });
 });
@@ -476,7 +514,6 @@ app.get('/api/all-events', (req, res) => {
             res.status(500).json({ error: 'Ошибка при получении мероприятий' });
             return;
         }
-        // Парсим JSON-поля с обработкой ошибок
         const events = rows.map(row => {
             let parsedParticipants = [];
             let parsedRouteData = null;
@@ -510,15 +547,15 @@ app.get('/api/all-events', (req, res) => {
     });
 });
 
-// Статические файлы (перемещено после API-маршрутов)
+// Static files
 app.use(express.static(__dirname));
 
-// Обработчик для несуществующих маршрутов
+// Handle non-existing routes
 app.use((req, res) => {
     res.status(404).json({ error: 'Маршрут не найден' });
 });
 
-// Запуска yet another server
+// Start the server
 const PORT = 3000;
 const server = app.listen(PORT, () => {
     console.log(`Сервер запущен на http://localhost:${PORT}`);

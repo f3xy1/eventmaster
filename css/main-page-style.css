@@ -91,7 +91,7 @@ nav ul li a {
 
 #events-feed {
     max-width: 800px;
-    margin: 80px auto 20px;
+    margin: 140px auto 20px; /* Adjusted to account for fixed filter section */
     padding: 20px;
 }
 
@@ -143,7 +143,73 @@ nav ul li a {
     padding: 20px;
 }
 
-/* Adjust for mobile devices */
+.join-btn {
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+.join-btn:hover {
+    background-color: #3267d6;
+}
+
+.join-btn:disabled, .join-btn.join-btn-disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.joined-label {
+    color: #2ecc71;
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+/* Updated styles for filter section */
+.filter-section {
+    background-color: #fff;
+    padding: 15px;
+    max-width: 800px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    top: 90px; /* Below the header (header height ~50px with padding) */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+    z-index: 900;
+    width: 100%; /* Ensure it respects max-width */
+
+}
+
+.filter-group {
+    display: inline-block;
+    margin-right: 20px;
+    vertical-align: middle;
+}
+
+.filter-group label {
+    color: #2c3e50;
+    font-weight: 500;
+    margin-right: 5px;
+}
+
+.filter-input {
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+    width: 120px;
+}
+
+.container {
+    margin-top: 180px;
+}
+
 @media (max-width: 768px) {
     .event-map {
         height: 200px;
@@ -151,9 +217,29 @@ nav ul li a {
     
     #events-feed {
         padding: 10px;
+        margin-top: 200px; /* Adjusted for mobile to account for stacked filters */
     }
     
     .event-card {
         padding: 15px;
+    }
+    
+    .join-btn {
+        padding: 8px 15px;
+        font-size: 0.9em;
+    }
+    
+    .filter-section {
+        padding: 10px;
+        top: 50px; /* Adjusted for smaller header on mobile */
+    }
+    
+    .filter-group {
+        display: block;
+        margin-bottom: 10px;
+    }
+    
+    .filter-input {
+        width: 100px;
     }
 }

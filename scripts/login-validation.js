@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.login-form');
     const inputList = Array.from(form.querySelectorAll('input:not([type="checkbox"])'));
     const buttonElement = form.querySelector('.login-button');
-    const formErrorElement = form.querySelector('.form-empty-error');
+    const formErrorElement = document.querySelector('.form-empty-error');
 
     startValidation();
 
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     toggleInputError(inputElement);
                 });
             } else {
-                // Отправляем данные на сервер
+                // Send login data to server
                 const loginOrEmail = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
 
@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include', // Include cookies
                         body: JSON.stringify({
                             loginOrEmail,
                             password,
@@ -37,9 +38,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     const result = await response.json();
                     if (result.success) {
                         console.log('Вход выполнен успешно');
-                        // Сохраняем userId в localStorage
-                        localStorage.setItem('current_user_id', result.userId);
-                        // Перенаправляем на страницу профиля
                         window.location.href = 'profile.html';
                     } else {
                         formErrorElement.textContent = result.error || 'Неверный логин/почта или пароль';

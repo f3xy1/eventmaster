@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 toggleInputError(checkboxElement);
             } else {
-                // Отправляем данные на сервер
                 const login = document.getElementById('firstName').value;
                 const name = document.getElementById('name').value;
                 const secondname = document.getElementById('secondname').value;
@@ -35,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include',
                         body: JSON.stringify({
                             login,
                             name,
@@ -47,9 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const result = await response.json();
                     if (result.success) {
                         console.log('Пользователь успешно зарегистрирован');
-                        // Сохраняем userId в localStorage
-                        localStorage.setItem('current_user_id', result.userId);
-                        window.location.href = 'login.html'; // Перенаправляем на страницу входа
+                        window.location.href = 'login.html';
                     } else {
                         formErrorElement.textContent = result.error || 'Ошибка при регистрации';
                     }

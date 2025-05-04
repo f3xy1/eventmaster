@@ -11,17 +11,35 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     
-    // Загружаем мероприятия пользователя с сервера
+    // Check user session
+    let userId;
+    try {
+        const response = await fetch('http://localhost:3000/api/check-session', {
+            credentials: 'include'
+        });
+        const result = await response.json();
+        if (!result.success) {
+            userId = null;
+        } else {
+            userId = result.userId;
+        }
+    } catch (e) {
+        console.error('Ошибка при проверке сессии:', e);
+        userId = null;
+    }
+
+    // Load user events
     let events = [];
-    const userId = localStorage.getItem('current_user_id');
     if (userId) {
         try {
-            const response = await fetch(`http://localhost:3000/api/events/${userId}`);
+            const response = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                credentials: 'include'
+            });
             const result = await response.json();
             if (result.success) {
                 events = result.events.map(event => ({
                     ...event,
-                    date: new Date(event.date) // Преобразуем дату из строки в объект Date
+                    date: new Date(event.date)
                 }));
             } else {
                 console.error('Ошибка при загрузке мероприятий:', result.error);
@@ -31,7 +49,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
-    // Render the weekday headers once since they're static
     function renderWeekdayHeaders() {
         weekdayGridEl.innerHTML = '';
         days.forEach(day => {
@@ -44,43 +61,29 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     function renderCalendar() {
         const today = new Date();
-        
         const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
                            'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
         currentMonthEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
         
-        // Clear the calendar
         calendarEl.innerHTML = '';
-        
-        // Get the first day of the month
         const firstDay = new Date(currentYear, currentMonth, 1);
-        
-        // Get the last day of the month
         const lastDay = new Date(currentYear, currentMonth + 1, 0);
-        
-        // Get the day of the week of the first day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
         let firstDayOfWeek = firstDay.getDay();
-        // Adjust for Monday as the first day of the week
         firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
         
-        // Calculate days from previous month
         const prevMonthDays = firstDayOfWeek;
         const prevMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
         const prevMonthLastDate = new Date(currentYear, currentMonth, 0);
         const prevMonth = prevMonthLastDate.getMonth();
         const prevYear = prevMonthLastDate.getFullYear();
         
-        // Add days from previous month
         for (let i = prevMonthDays - 1; i >= 0; i--) {
             const dayNum = prevMonthLastDay - i;
             const dayEl = createDayElement(dayNum, true);
-            
-            // Create events container div
             const eventsContainer = document.createElement('div');
             eventsContainer.classList.add('events-container');
             dayEl.appendChild(eventsContainer);
             
-            // Add events for this previous month day
             const dayEvents = events.filter(event => {
                 const eventDate = new Date(event.date);
                 return eventDate.getDate() === dayNum && 
@@ -93,36 +96,26 @@ document.addEventListener('DOMContentLoaded', async function() {
                 eventEl.classList.add('event');
                 eventEl.textContent = event.title;
                 eventEl.dataset.eventId = event.id;
-                
-                // Add click event to show event details
                 eventEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent day click event
+                    e.stopPropagation();
                     openEventDetails(event);
                 });
-                
                 eventsContainer.appendChild(eventEl);
             });
             
-            // Add click event to open modal for adding new event
             dayEl.addEventListener('click', () => openModal(dayNum, prevMonth, prevYear));
-            
             calendarEl.appendChild(dayEl);
         }
         
-        // Add days of the current month
         for (let day = 1; day <= lastDay.getDate(); day++) {
             const isToday = today.getDate() === day && 
                            today.getMonth() === currentMonth && 
                            today.getFullYear() === currentYear;
-            
             const dayEl = createDayElement(day, false, isToday);
-            
-            // Create events container div
             const eventsContainer = document.createElement('div');
             eventsContainer.classList.add('events-container');
             dayEl.appendChild(eventsContainer);
             
-            // Add events for this day
             const dayEvents = events.filter(event => {
                 const eventDate = new Date(event.date);
                 return eventDate.getDate() === day && 
@@ -135,45 +128,31 @@ document.addEventListener('DOMContentLoaded', async function() {
                 eventEl.classList.add('event');
                 eventEl.textContent = event.title;
                 eventEl.dataset.eventId = event.id;
-                
-                // Add click event to show event details
                 eventEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent day click event
+                    e.stopPropagation();
                     openEventDetails(event);
                 });
-                
                 eventsContainer.appendChild(eventEl);
             });
             
-            // Add click event to open modal for adding new event
             dayEl.addEventListener('click', () => openModal(day, currentMonth, currentYear));
-            
             calendarEl.appendChild(dayEl);
         }
         
-        // Calculate the number of rows needed for this month
         const totalDaysShown = prevMonthDays + lastDay.getDate();
         const rows = Math.ceil(totalDaysShown / 7);
-        
-        // Calculate how many days we need from the next month
         const totalCells = rows * 7;
         const nextMonthDays = totalCells - totalDaysShown;
-        
-        // Get next month and year
         const nextMonthFirstDate = new Date(currentYear, currentMonth + 1, 1);
         const nextMonth = nextMonthFirstDate.getMonth();
         const nextYear = nextMonthFirstDate.getFullYear();
         
-        // Add days from next month
         for (let day = 1; day <= nextMonthDays; day++) {
             const dayEl = createDayElement(day, true);
-            
-            // Create events container div
             const eventsContainer = document.createElement('div');
             eventsContainer.classList.add('events-container');
             dayEl.appendChild(eventsContainer);
             
-            // Add events for this next month day
             const dayEvents = events.filter(event => {
                 const eventDate = new Date(event.date);
                 return eventDate.getDate() === day && 
@@ -186,23 +165,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                 eventEl.classList.add('event');
                 eventEl.textContent = event.title;
                 eventEl.dataset.eventId = event.id;
-                
-                // Add click event to show event details
                 eventEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent day click event
+                    e.stopPropagation();
                     openEventDetails(event);
                 });
-                
                 eventsContainer.appendChild(eventEl);
             });
             
-            // Add click event to open modal for adding new event
             dayEl.addEventListener('click', () => openModal(day, nextMonth, nextYear));
-            
             calendarEl.appendChild(dayEl);
         }
         
-        // Add class to calendar indicating how many rows it has
         calendarEl.className = 'calendar';
         calendarEl.classList.add(`calendar-rows-${rows}`);
     }
@@ -210,21 +183,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     function createDayElement(day, isInactive, isToday = false) {
         const dayEl = document.createElement('div');
         dayEl.classList.add('calendar-day');
-        
         if (isInactive) {
             dayEl.classList.add('inactive');
         }
-        
         if (isToday) {
             dayEl.classList.add('today');
         }
-        
         const dayNumberEl = document.createElement('div');
         dayNumberEl.classList.add('day-number');
         dayNumberEl.textContent = day;
-        
         dayEl.appendChild(dayNumberEl);
-        
         return dayEl;
     }
     
@@ -246,10 +214,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderCalendar();
     });
     
-    // Modal window functions for event creation
     function openModal(day, month, year) {
-        // Проверяем, авторизован ли пользователь
-        const userId = localStorage.getItem('current_user_id');
         if (!userId) {
             alert('Пожалуйста, войдите в аккаунт, чтобы создать мероприятие');
             window.location.href = 'login.html';
@@ -264,7 +229,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const participantsInput = document.getElementById('eventParticipants');
         const routeDistance = document.getElementById('routeDistance');
         
-        // Reset form
         timeInput.value = '';
         titleInput.value = '';
         descriptionInput.value = '';
@@ -273,43 +237,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         routeDistance.textContent = 'Маршрут не задан';
         document.getElementById('participantsFeedback').innerHTML = '';
         
-        // Set date value
         dateInput.value = `${day}.${month + 1}.${year}`;
-        
-        // Display modal
         modal.style.display = 'flex';
     }
     
-    // Event details modal functions
     async function openEventDetails(event) {
         const detailsModal = document.getElementById('eventDetailsModal');
         const detailsTitle = document.getElementById('detailsTitle');
-        
-        // Switch to view mode
         await toggleEventDetailsMode('view', event);
-
-        // Set modal title
         detailsTitle.textContent = 'Информация о мероприятии';
-        
-        // Display modal
         detailsModal.style.display = 'flex';
     }
     
-    // Store original route data for cancel operation
     let originalRouteData = null;
     let originalRouteDistance = null;
     
-    // Toggle between view and edit modes for event details
     async function toggleEventDetailsMode(mode, event) {
         const detailsContent = document.querySelector('.event-details');
         const detailsTitle = document.getElementById('detailsTitle');
         
         if (mode === 'view') {
-            // Clear stored route data when switching to view mode
             originalRouteData = null;
             originalRouteDistance = null;
-            
-            // View mode: Show event details
             const participantNames = await getParticipantNames(event.participants);
             detailsContent.innerHTML = `
                 <div class="form-group">
@@ -351,15 +300,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
             `;
             
-            // Add event listeners for buttons
             document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
             document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
         } else {
-            // Store original route data and distance
             originalRouteData = event.route_data ? JSON.stringify(event.route_data) : '';
             originalRouteDistance = event.distance ? event.distance.toFixed(2) + ' км' : 'Маршрут не задан';
-            
-            // Edit mode: Show form for editing
             const participantLogins = await getParticipantNames(event.participants, true);
             detailsTitle.textContent = 'Редактирование мероприятия';
             detailsContent.innerHTML = `
@@ -407,28 +352,25 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </form>
             `;
             
-            // Add event listeners
             document.getElementById('cancelEditBtn').addEventListener('click', () => {
-                // Restore original route data and distance in form fields
                 document.getElementById('editRouteData').value = originalRouteData;
                 document.getElementById('editRouteDistance').textContent = originalRouteDistance;
-                // Switch back to view mode without resetting the edit map
                 toggleEventDetailsMode('view', event);
             });
             document.getElementById('editEventForm').addEventListener('submit', (e) => handleEditFormSubmit(e, event));
             document.getElementById('editEventParticipants').addEventListener('input', handleParticipantsInput);
-            // Initialize map for editing
             initializeEditMap(event.route_data);
         }
     }
     
-    // Get participant names for display
     async function getParticipantNames(participants, returnLogins = false) {
         let participantNames = [];
         if (participants && participants.length > 0) {
             for (const login of participants) {
                 try {
-                    const response = await fetch(`http://localhost:3000/api/check-user-login/${login}`);
+                    const response = await fetch(`http://localhost:3000/api/check-user-login/${login}`, {
+                        credentials: 'include'
+                    });
                     const result = await response.json();
                     if (result.success) {
                         const name = result.user.name || '';
@@ -447,7 +389,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         return participantNames.length > 0 ? participantNames.join(', ') : (returnLogins ? '' : 'Нет участников');
     }
     
-    // Handle participants input for edit form
     let participantMap = new Map();
     let lastInputValue = '';
     
@@ -477,7 +418,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         try {
-            const response = await fetch(`http://localhost:3000/api/check-user-login/${lastParticipant}`);
+            const response = await fetch(`http://localhost:3000/api/check-user-login/${lastParticipant}`, {
+                credentials: 'include'
+            });
             const result = await response.json();
             
             if (result.success) {
@@ -521,7 +464,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     document.getElementById('eventParticipants').addEventListener('input', handleParticipantsInput);
     
-    // Handle edit form submission
     async function handleEditFormSubmit(e, event) {
         e.preventDefault();
         
@@ -562,10 +504,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         let creator = 'Неизвестный пользователь';
-        const userId = localStorage.getItem('current_user_id');
         if (userId) {
             try {
-                const response = await fetch(`http://localhost:3000/api/user/${userId}`);
+                const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
+                    credentials: 'include'
+                });
                 const result = await response.json();
                 if (result.success) {
                     const name = result.user.name || '';
@@ -594,6 +537,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     user_id: userId,
                     title: titleValue,
@@ -609,7 +553,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             const result = await response.json();
             if (result.success) {
-                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`);
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                    credentials: 'include'
+                });
                 const eventResult = await eventResponse.json();
                 if (eventResult.success) {
                     events = eventResult.events.map(event => ({
@@ -631,24 +577,25 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
-    // Handle event deletion
     async function deleteEvent(eventId) {
         if (!confirm('Вы уверены, что хотите удалить это мероприятие?')) {
             return;
         }
         
-        const userId = localStorage.getItem('current_user_id');
         try {
-            const response = await fetch(`http://localhost:3000/api/events/${eventId}?user_id=${userId}`, {
+            const response = await fetch(`http://localhost:3000/api/events/${eventId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include'
             });
 
             const result = await response.json();
             if (result.success) {
-                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`);
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                    credentials: 'include'
+                });
                 const eventResult = await eventResponse.json();
                 if (eventResult.success) {
                     events = eventResult.events.map(event => ({
@@ -670,21 +617,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
-    // Initialize map for editing
     function initializeEditMap(routeData) {
-        // Use routePlanner to initialize the edit map
         window.routePlanner.initMap('editMap', 'edit', routeData);
     }
     
-    // Close modal when clicking on X
     document.querySelector('.close-btn').addEventListener('click', closeModal);
     document.querySelector('.close-details').addEventListener('click', closeEventDetails);
     
-    // Form submission handling for creation
     document.getElementById('registrationForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // Get form values
         const dateValue = document.getElementById('eventDate').value;
         const timeValue = document.getElementById('eventTime').value;
         const titleValue = document.getElementById('eventTitle').value;
@@ -693,20 +635,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         const routeDataValue = document.getElementById('routeData').value;
         const routeDistanceText = document.getElementById('routeDistance').textContent;
         
-        // Parse date (format: "DD.MM.YYYY" to ISO 8601 "YYYY-MM-DD")
         const dateParts = dateValue.split('.');
         const year = parseInt(dateParts[2]);
-        const month = parseInt(dateParts[1]) - 1; // month (0-11)
+        const month = parseInt(dateParts[1]) - 1;
         const day = parseInt(dateParts[0]);
         const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
-        // Parse distance
         let distance = null;
         if (routeDistanceText !== 'Маршрут не задан') {
             distance = parseFloat(routeDistanceText.replace(' км', ''));
         }
         
-        // Parse participants
         const participants = participantsValue.split(',').map(p => {
             for (let [login, fullName] of participantMap.entries()) {
                 if (fullName === p.trim()) {
@@ -724,12 +663,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
         
-        // Get creator
         let creator = 'Неизвестный пользователь';
-        const userId = localStorage.getItem('current_user_id');
         if (userId) {
             try {
-                const response = await fetch(`http://localhost:3000/api/user/${userId}`);
+                const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
+                    credentials: 'include'
+                });
                 const result = await response.json();
                 if (result.success) {
                     const name = result.user.name || '';
@@ -741,19 +680,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
         
-        // Parse route data
         let routeData = null;
         if (routeDataValue && routeDataValue !== '') {
             routeData = JSON.parse(routeDataValue);
         }
         
-        // Отправляем данные на сервер
         try {
             const response = await fetch('http://localhost:3000/api/events', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     user_id: userId,
                     title: titleValue,
@@ -769,8 +707,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             const result = await response.json();
             if (result.success) {
-                // Обновляем список мероприятий
-                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`);
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                    credentials: 'include'
+                });
                 const eventResult = await eventResponse.json();
                 if (eventResult.success) {
                     events = eventResult.events.map(event => ({
@@ -800,7 +739,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('eventDetailsModal').style.display = 'none';
     }
     
-    // Initial render
     renderWeekdayHeaders();
     renderCalendar();
 });
