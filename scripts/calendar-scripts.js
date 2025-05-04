@@ -284,7 +284,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function openEventDetails(event) {
         const detailsModal = document.getElementById('eventDetailsModal');
         const detailsTitle = document.getElementById('detailsTitle');
-        const detailsContent = document.querySelector('.event-details');
         
         // Switch to view mode
         await toggleEventDetailsMode('view', event);
@@ -296,12 +295,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         detailsModal.style.display = 'flex';
     }
     
+    // Store original route data for cancel operation
+    let originalRouteData = null;
+    let originalRouteDistance = null;
+    
     // Toggle between view and edit modes for event details
     async function toggleEventDetailsMode(mode, event) {
         const detailsContent = document.querySelector('.event-details');
         const detailsTitle = document.getElementById('detailsTitle');
         
         if (mode === 'view') {
+            // Clear stored route data when switching to view mode
+            originalRouteData = null;
+            originalRouteDistance = null;
+            
             // View mode: Show event details
             const participantNames = await getParticipantNames(event.participants);
             detailsContent.innerHTML = `
@@ -348,6 +355,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
             document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
         } else {
+            // Store original route data and distance
+            originalRouteData = event.route_data ? JSON.stringify(event.route_data) : '';
+            originalRouteDistance = event.distance ? event.distance.toFixed(2) + ' км' : 'Маршрут не задан';
+            
             // Edit mode: Show form for editing
             const participantLogins = await getParticipantNames(event.participants, true);
             detailsTitle.textContent = 'Редактирование мероприятия';
@@ -397,7 +408,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             `;
             
             // Add event listeners
-            document.getElementById('cancelEditBtn').addEventListener('click', () => toggleEventDetailsMode('view', event));
+            document.getElementById('cancelEditBtn').addEventListener('click', () => {
+                // Restore original route data and distance in form fields
+                document.getElementById('editRouteData').value = originalRouteData;
+                document.getElementById('editRouteDistance').textContent = originalRouteDistance;
+                // Switch back to view mode without resetting the edit map
+                toggleEventDetailsMode('view', event);
+            });
             document.getElementById('editEventForm').addEventListener('submit', (e) => handleEditFormSubmit(e, event));
             document.getElementById('editEventParticipants').addEventListener('input', handleParticipantsInput);
             // Initialize map for editing
