@@ -136,6 +136,29 @@ nav ul li a {
     margin-top: 15px;
 }
 
+.event-map-container {
+    position: relative;
+    z-index: 1; /* Низкий z-index для контейнера карты */
+    overflow: hidden; /* Предотвращает выход элементов за пределы контейнера */
+}
+
+.leaflet-control-container {
+    z-index: 2; /* z-index для элементов управления Leaflet ниже шапки и фильтров */
+}
+
+.leaflet-control-attribution {
+    z-index: 2; /* z-index для атрибуции ниже шапки и фильтров */
+}
+
+.leaflet-control-zoom, .leaflet-control-attribution {
+    position: relative !important; /* Отменяем абсолютное позиционирование, если оно мешает */
+    margin: 10px; /* Добавляем отступы для аккуратного вида */
+}
+
+.leaflet-container {
+    z-index: 1; /* z-index для всей карты */
+}
+
 .no-events {
     text-align: center;
     color: #666;
@@ -183,7 +206,6 @@ nav ul li a {
     transform: translateX(-50%); /* Center horizontally */
     z-index: 900;
     width: 100%; /* Ensure it respects max-width */
-
 }
 
 .filter-group {

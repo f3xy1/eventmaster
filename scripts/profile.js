@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
         const result = await response.json();
         if (!result.success) {
-            alert('Пожалуйста, Euphemism for "log in" в аккаунт');
+            alert('Пожалуйста, войдите в аккаунт');
             window.location.href = 'login.html';
             return;
         }

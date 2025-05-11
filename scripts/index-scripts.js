@@ -214,9 +214,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                         }
 
                         // Initialize Leaflet map
-                        const map = L.map(`map-${event.id}`).setView([56.8375, 60.5975], 13);
+                        const map = L.map(`map-${event.id}`, {
+                            zoomControl: true // Убедимся, что управление зумом включено
+                        }).setView([56.8375, 60.5975], 13);
+
+                        // Add tile layer
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                            zIndex: 1 // Устанавливаем z-index для слоя карты
                         }).addTo(map);
 
                         // Decode and render route
@@ -231,14 +236,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const routePolyline = L.polyline(points, {
                             color: '#4a6fa5',
                             weight: 5,
-                            opacity: 0.7
+                            opacity: 0.7,
+                            zIndex: 2 // Устанавливаем z-index для маршрута
                         }).addTo(map);
 
                         // Render waypoints if available
                         if (path.snapped_waypoints) {
                             const waypointPoints = polyline.decode(path.snapped_waypoints).map(coord => [coord[0], coord[1]]);
                             waypointPoints.forEach(point => {
-                                L.marker(point).addTo(map);
+                                L.marker(point, { zIndexOffset: 10 }).addTo(map); // Устанавливаем z-index для маркеров
                             });
                             console.log(`Добавлено ${waypointPoints.length} путевых точек для события ${event.id}`);
                         }
