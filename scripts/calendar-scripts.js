@@ -267,6 +267,27 @@ document.addEventListener('DOMContentLoaded', async function() {
             originalRouteData = null;
             originalRouteDistance = null;
             const participantNames = await getParticipantNames(event.participants);
+
+            // Check if the logged-in user is the organizer
+            let isOrganizer = false;
+            if (userId) {
+                try {
+                    const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
+                        credentials: 'include'
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        const name = result.user.name || '';
+                        const secondname = result.user.secondname || '';
+                        const fullName = `${name} ${secondname}`.trim() || result.user.login;
+                        isOrganizer = fullName === event.creator;
+                    }
+                } catch (e) {
+                    console.error('Ошибка при проверке организатора:', e);
+                }
+            }
+
+            // Render event details, conditionally include Edit/Delete buttons
             detailsContent.innerHTML = `
                 <div class="form-group">
                     <label>Дата:</label>
@@ -301,14 +322,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <div id="detailsMap"></div>
                     <input type="hidden" id="detailsRouteData" value='${event.route_data ? JSON.stringify(event.route_data) : ''}'>
                 </div>
+                ${isOrganizer ? `
                 <div class="form-group action-buttons">
                     <button id="editEventBtn" class="form-btn edit-btn">Редактировать</button>
                     <button id="deleteEventBtn" class="form-btn delete-btn">Удалить</button>
                 </div>
+                ` : ''}
             `;
             
-            document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
-            document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
+            if (isOrganizer) {
+                document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
+                document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
+            }
         } else {
             originalRouteData = event.route_data ? JSON.stringify(event.route_data) : '';
             originalRouteDistance = event.distance ? event.distance.toFixed(2) + ' км' : 'Маршрут не задан';
@@ -548,7 +573,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 body: JSON.stringify({
                     user_id: userId,
                     title: titleValue,
-                    description: titleValue,
+                    description: descriptionValue,
                     date: isoDate,
                     time: timeValue,
                     creator: creator,
@@ -675,7 +700,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
                     credentials: 'include'
-            });
+                });
                 const result = await response.json();
                 if (result.success) {
                     const name = result.user.name || '';

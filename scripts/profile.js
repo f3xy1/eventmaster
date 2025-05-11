@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 const statusEl = document.createElement('p');
                 statusEl.className = 'event-status';
-                statusEl.textContent = event.user_id === userId ? 'Создатель' : 'Участник';
+                statusEl.textContent = event.user_id === userId ? 'Организатор' : 'Участник';
                 eventEl.appendChild(statusEl);
 
                 const dateEl = document.createElement('p');

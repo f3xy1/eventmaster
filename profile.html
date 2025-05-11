@@ -12,7 +12,6 @@
         <nav>
             <ul>
                 <li><a href="calendar.html">Организация мероприятия</a></li>
-                <li><a href="#">Пригласить участников</a></li>
                 <li><a href="sign-up.html">Регистрация</a></li>
                 <li><a href="login.html">Вход</a></li>
                 <li><a href="profile.html" class="profile-icon"></a></li>
@@ -32,10 +31,13 @@
             </div>
             <div class="info-container">
                 <p class="email">Почта:</p>
-                <p class="email-from-db">ivanov@example.com</p>
+                <p class="email-from-db"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b09986919e9f86b09588919d809c95de939f9d">[email protected]</a></p>
             </div>
             <a class="edit-btn">
                 <img src="images/edit.svg" alt="Edit Profile" class="edit-icon">
+            </a>
+            <a class="logout-btn" id="logoutButton">
+                <img src="images/logout.svg" alt="Logout" class="logout-icon">
             </a>
         </div>
         
@@ -43,6 +45,10 @@
             <h2>Ваши мероприятия</h2>
         </div>
     </div>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
     <script src="scripts/profile.js"></script>
+    <script src="scripts/profile_v2.js"></script>
+    <script src="scripts/auth-check.js"></script>
+    <script src="scripts/cloudflare-challenge.js"></script>
 </body>
 </html>

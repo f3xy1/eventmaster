@@ -22,8 +22,8 @@
                             type="text"
                             id="firstName"
                             name="firstName"
-                            pattern="^[a-zA-Zа-яА-ЯЁё \-]+$"
-                            data-error-message="Разрешены символы латиницы, кириллицы, знаки дефиса и пробелы"
+                            pattern="^[a-zA-Zа-яА-ЯЁё0-9 \-]+$"
+                            data-error-message="Разрешены символы латиницы, кириллицы, цифры, знаки дефиса и пробелы"
                             aria-describedby="firstName-error"
                             required
                         >
@@ -131,5 +131,6 @@
     </div>
     <script src="scripts/signup-base-scripts.js"></script>
     <script src="scripts/signup-validation.js"></script>
+    <script src="scripts/cloudflare-challenge.js"></script>
 </body>
 </html>
