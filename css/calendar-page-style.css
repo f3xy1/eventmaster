@@ -130,6 +130,7 @@ header {
     cursor: pointer;
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Prevent content from overflowing */
 }
 
 .calendar-day:hover {
@@ -189,9 +190,9 @@ header {
     padding: 3px 5px;
     border-radius: 3px;
     font-size: 0.8em;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow: hidden; /* Hide overflow text */
+    white-space: nowrap; /* Prevent wrapping */
+    text-overflow: ellipsis; /* Add ellipsis for overflow */
     cursor: pointer;
 }
 

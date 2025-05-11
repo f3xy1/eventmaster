@@ -59,6 +59,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     
+    function truncateTitle(title, maxLength = 30) {
+        if (title.length > maxLength) {
+            return title.substring(0, maxLength - 3) + '...';
+        }
+        return title;
+    }
+    
     function renderCalendar() {
         const today = new Date();
         const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
@@ -94,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             dayEvents.forEach(event => {
                 const eventEl = document.createElement('div');
                 eventEl.classList.add('event');
-                eventEl.textContent = event.title;
+                eventEl.textContent = truncateTitle(event.title);
                 eventEl.dataset.eventId = event.id;
                 eventEl.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -126,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             dayEvents.forEach(event => {
                 const eventEl = document.createElement('div');
                 eventEl.classList.add('event');
-                eventEl.textContent = event.title;
+                eventEl.textContent = truncateTitle(event.title);
                 eventEl.dataset.eventId = event.id;
                 eventEl.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -163,7 +170,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             dayEvents.forEach(event => {
                 const eventEl = document.createElement('div');
                 eventEl.classList.add('event');
-                eventEl.textContent = event.title;
+                eventEl.textContent = truncateTitle(event.title);
                 eventEl.dataset.eventId = event.id;
                 eventEl.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -319,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>
                     <div class="form-group">
                         <label>Название:</label>
-                        <input type="text" id="editEventTitle" value="${event.title}" required>
+                        <input type="text" id="editEventTitle" value="${event.title}" maxlength="40" required>
                     </div>
                     <div class="form-group">
                         <label>Описание:</label>
@@ -541,7 +548,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 body: JSON.stringify({
                     user_id: userId,
                     title: titleValue,
-                    description: descriptionValue,
+                    description: titleValue,
                     date: isoDate,
                     time: timeValue,
                     creator: creator,
@@ -668,7 +675,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
                     credentials: 'include'
-                });
+            });
                 const result = await response.json();
                 if (result.success) {
                     const name = result.user.name || '';
