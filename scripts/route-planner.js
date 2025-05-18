@@ -9,11 +9,29 @@ document.addEventListener('DOMContentLoaded', function() {
         details: { map: null, markers: [], routeLayer: null, currentRoute: null }
     };
 
+    // Custom red marker icon
+    const redMarkerIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        shadowSize: [41, 41]
+    });
+
     // Function to initialize a map for a given context
     function initMap(mapId, context = 'creation', routeData = null) {
         const state = mapStates[context];
         if (state.map !== null) {
-            console.log(`Map for ${context} already initialized, skipping reinitialization.`);
+            console.log(`Map for ${context} already initialized, ensuring click event.`);
+            // Ensure click event is attached
+            state.map.off('click'); // Remove existing to avoid duplicates
+            if (context === 'creation' || context === 'edit') {
+                state.map.on('click', function(e) {
+                    console.log(`Map clicked in ${context} mode at: ${e.latlng.lat}, ${e.latlng.lng}`);
+                    addWaypoint(e.latlng.lat, e.latlng.lng, context);
+                });
+            }
             return; // Don't reinitialize if already exists
         }
 
@@ -36,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // For creation and edit contexts, add interactive events
         if (context === 'creation' || context === 'edit') {
-            // Add click event for adding waypoints
             state.map.on('click', function(e) {
                 console.log(`Map clicked in ${context} mode at: ${e.latlng.lat}, ${e.latlng.lng}`);
                 addWaypoint(e.latlng.lat, e.latlng.lng, context);
@@ -72,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.paths && data.paths[0].snapped_waypoints) {
                     const waypoints = polyline.decode(data.paths[0].snapped_waypoints).map(coord => [coord[0], coord[1]]);
                     console.log(`Loading ${waypoints.length} waypoints for ${context} mode:`, waypoints);
-                    waypoints.forEach(point => addWaypoint(point[0], point[1], context));
+                    waypoints.forEach((point, index) => addWaypoint(point[0], point[1], context));
                 }
             } catch (error) {
                 console.error(`Ошибка загрузки маршрута для ${context}:`, error);
@@ -101,33 +118,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to add a waypoint
     function addWaypoint(lat, lng, context = 'creation') {
-        const state = mapStates[context];
+        try {
+            const state = mapStates[context];
+            if (!state.map) {
+                console.error(`Map not initialized for ${context} context`);
+                return;
+            }
 
-        // Create a marker
-        const marker = L.marker([lat, lng], {
-            draggable: context === 'creation' || context === 'edit' // Draggable in creation and edit modes
-        }).addTo(state.map);
+            // Create a marker with red icon for the first marker, omit icon for others to use default
+            const markerOptions = {
+                draggable: context === 'creation' || context === 'edit'
+            };
+            if (state.markers.length === 0) {
+                markerOptions.icon = redMarkerIcon; // Use red icon for first marker
+            }
+            const marker = L.marker([lat, lng], markerOptions).addTo(state.map);
 
-        console.log(`Added waypoint at (${lat}, ${lng}) in ${context} mode, draggable: ${marker.options.draggable}`);
-        state.markers.push(marker);
+            console.log(`Added waypoint at (${lat}, ${lng}) in ${context} mode, draggable: ${marker.options.draggable}, isFirst: ${state.markers.length === 0}, totalMarkers: ${state.markers.length + 1}`);
+            state.markers.push(marker);
 
-        // Add dragend event for creation/edit
-        if (context === 'creation' || context === 'edit') {
-            marker.on('dragend', function() {
-                console.log(`Waypoint dragged to (${marker.getLatLng().lat}, ${marker.getLatLng().lng}) in ${context} mode`);
-                updateRoute(context);
-            });
+            // Add dragend event for creation/edit
+            if (context === 'creation' || context === 'edit') {
+                marker.on('dragend', function() {
+                    console.log(`Waypoint dragged to (${marker.getLatLng().lat}, ${marker.getLatLng().lng}) in ${context} mode`);
+                    updateRoute(context);
+                });
 
-            // Add contextmenu event to remove marker
-            marker.on('contextmenu', function() {
-                console.log(`Removing waypoint at (${lat}, ${lng}) in ${context} mode`);
-                removeWaypoint(marker, context);
-            });
-        }
+                // Add contextmenu event to remove marker
+                marker.on('contextmenu', function() {
+                    console.log(`Removing waypoint at (${lat}, ${lng}) in ${context} mode`);
+                    removeWaypoint(marker, context);
+                });
+            }
 
-        // Calculate route if there are at least 2 points
-        if (state.markers.length >= 2 && context !== 'details') {
-            calculateRoute(context);
+            // Calculate route if there are at least 2 points
+            if (state.markers.length >= 2 && context !== 'details') {
+                calculateRoute(context);
+            }
+        } catch (error) {
+            console.error(`Error in addWaypoint for ${context} context:`, error);
         }
     }
 
@@ -260,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const data = typeof routeData === 'string' ? JSON.parse(routeData) : routeData;
             if (!data.paths || !data.paths[0] || !data.paths[0].points) {
-                console.warn(`Invalid route data for ${context}:`, data);
+                console.warn(`Invalid route data:`, data);
                 document.getElementById(containerId).style.display = 'none';
                 return;
             }
@@ -309,8 +338,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (context === 'details' && path.snapped_waypoints) {
                 const waypointPoints = polyline.decode(path.snapped_waypoints).map(coord => [coord[0], coord[1]]);
                 console.log(`Loading ${waypointPoints.length} waypoints for ${context}:`, waypointPoints);
-                waypointPoints.forEach(point => {
-                    const marker = L.marker(point).addTo(state.map);
+                waypointPoints.forEach((point, index) => {
+                    const markerOptions = {};
+                    if (index === 0) {
+                        markerOptions.icon = redMarkerIcon; // Red icon for first waypoint
+                    }
+                    const marker = L.marker(point, markerOptions).addTo(state.map);
                     state.markers.push(marker);
                 });
             }

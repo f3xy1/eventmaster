@@ -4,6 +4,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     let user = null;
     let filteredEvents = [];
 
+    // Custom red marker icon
+    const redMarkerIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        shadowSize: [41, 41]
+    });
+
     // Create filter section with styling
     const filterSection = document.createElement('div');
     filterSection.className = 'filter-section';
@@ -243,8 +253,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                         // Render waypoints if available
                         if (path.snapped_waypoints) {
                             const waypointPoints = polyline.decode(path.snapped_waypoints).map(coord => [coord[0], coord[1]]);
-                            waypointPoints.forEach(point => {
-                                L.marker(point, { zIndexOffset: 10 }).addTo(map); // Устанавливаем z-index для маркеров
+                            waypointPoints.forEach((point, index) => {
+                                const markerOptions = {
+                                    zIndexOffset: 10
+                                };
+                                if (index === 0) {
+                                    markerOptions.icon = redMarkerIcon; // Red icon for first waypoint
+                                }
+                                const marker = L.marker(point, markerOptions).addTo(map);
                             });
                             console.log(`Добавлено ${waypointPoints.length} путевых точек для события ${event.id}`);
                         }
