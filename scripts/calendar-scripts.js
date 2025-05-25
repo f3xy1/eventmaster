@@ -268,7 +268,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             originalRouteDistance = null;
             const participantNames = await getParticipantNames(event.participants);
 
-            // Check if the logged-in user is the organizer
             let isOrganizer = false;
             if (userId) {
                 try {
@@ -287,7 +286,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
             }
 
-            // Render event details, conditionally include Edit/Delete buttons
             detailsContent.innerHTML = `
                 <div class="form-group">
                     <label>Дата:</label>
@@ -403,6 +401,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const response = await fetch(`http://localhost:3000/api/check-user-login/${login}`, {
                         credentials: 'include'
                     });
+                    if (!response.ok) {
+                        console.warn(`User ${login} not found, skipping validation: ${response.status} ${response.statusText}`);
+                        participantNames.push(login);
+                        continue;
+                    }
                     const result = await response.json();
                     if (result.success) {
                         const name = result.user.name || '';
@@ -410,6 +413,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const fullName = `${name} ${secondname}`.trim() || login;
                         participantNames.push(returnLogins ? login : fullName);
                     } else {
+                        console.warn(`Validation failed for ${login}: ${result.error}`);
                         participantNames.push(login);
                     }
                 } catch (err) {
@@ -445,7 +449,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (participants.length === 0) return;
         
         const lastParticipant = participants[participants.length - 1];
-        if (participantMap.has([...participantMap.entries()].find(([_, fullName]) => fullName === lastParticipant)?.[0])) {
+        if (participantMap.has(lastParticipant)) {
             return;
         }
         
@@ -453,6 +457,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch(`http://localhost:3000/api/check-user-login/${lastParticipant}`, {
                 credentials: 'include'
             });
+            if (!response.ok) {
+                const feedbackItem = document.createElement('div');
+                feedbackItem.classList.add('participant-error');
+                feedbackItem.innerHTML = `✖ Пользователь ${lastParticipant} не найден`;
+                feedbackElement.appendChild(feedbackItem);
+                return;
+            }
             const result = await response.json();
             
             if (result.success) {
@@ -461,6 +472,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const fullName = `${name} ${secondname}`.trim() || lastParticipant;
                 participantMap.set(lastParticipant, fullName);
                 
+                // Update the input with full name for display, but keep login in the map
                 participants[participants.length - 1] = fullName;
                 const newValue = participants.join(', ');
                 
@@ -497,117 +509,109 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('eventParticipants').addEventListener('input', handleParticipantsInput);
     
     async function handleEditFormSubmit(e, event) {
-        e.preventDefault();
-        
-        const dateValue = document.getElementById('editEventDate').value;
-        const timeValue = document.getElementById('editEventTime').value;
-        const titleValue = document.getElementById('editEventTitle').value;
-        const descriptionValue = document.getElementById('editEventDescription').value;
-        const participantsValue = document.getElementById('editEventParticipants').value;
-        const routeDataValue = document.getElementById('editRouteData').value;
-        const routeDistanceText = document.getElementById('editRouteDistance').textContent;
-        
-        const dateParts = dateValue.split('.');
-        const year = parseInt(dateParts[2]);
-        const month = parseInt(dateParts[1]) - 1;
-        const day = parseInt(dateParts[0]);
-        const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
-        let distance = null;
-        if (routeDistanceText !== 'Маршрут не задан') {
-            distance = parseFloat(routeDistanceText.replace(' км', ''));
-        }
-        
-        const participants = participantsValue.split(',').map(p => {
-            for (let [login, fullName] of participantMap.entries()) {
-                if (fullName === p.trim()) {
-                    return login;
-                }
-            }
-            return p.trim();
-        }).filter(p => p !== '');
-        
-        if (participants.length > 0) {
-            const invalidParticipants = participants.filter(p => !participantMap.has(p));
-            if (invalidParticipants.length > 0) {
-                alert('Пожалуйста, исправьте ошибки в списке участников перед сохранением.');
-                return;
+    e.preventDefault();
+    
+    const dateValue = document.getElementById('editEventDate').value;
+    const timeValue = document.getElementById('editEventTime').value;
+    const titleValue = document.getElementById('editEventTitle').value;
+    const descriptionValue = document.getElementById('editEventDescription').value;
+    const participantsValue = document.getElementById('editEventParticipants').value;
+    const routeDataValue = document.getElementById('editRouteData').value; // Исправлено: теперь берется из правильного поля
+    const routeDistanceText = document.getElementById('editRouteDistance').textContent;
+    
+    const dateParts = dateValue.split('.');
+    const year = parseInt(dateParts[2]);
+    const month = parseInt(dateParts[1]) - 1;
+    const day = parseInt(dateParts[0]);
+    const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    let distance = null;
+    if (routeDistanceText !== 'Маршрут не задан') {
+        distance = parseFloat(routeDistanceText.replace(' км', ''));
+    }
+    
+    const participants = participantsValue.split(',').map(p => {
+        for (let [login, fullName] of participantMap.entries()) {
+            if (fullName === p.trim()) {
+                return login;
             }
         }
-        
-        let creator = 'Неизвестный пользователь';
-        if (userId) {
-            try {
-                const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
-                    credentials: 'include'
-                });
-                const result = await response.json();
-                if (result.success) {
-                    const name = result.user.name || '';
-                    const secondname = result.user.secondname || '';
-                    creator = `${name} ${secondname}`.trim() || 'Неизвестный пользователь';
-                }
-            } catch (e) {
-                console.error('Ошибка при получении данных пользователя:', e);
-            }
-        }
-        
-        let routeData = null;
-        if (routeDataValue && routeDataValue !== '') {
-            try {
-                routeData = JSON.parse(routeDataValue);
-            } catch (e) {
-                console.error('Ошибка при парсинге routeData:', e);
-                alert('Ошибка в данных маршрута.');
-                return;
-            }
-        }
-        
+        return p.trim();
+    }).filter(p => p !== '');
+    
+    let creator = 'Неизвестный пользователь';
+    if (userId) {
         try {
-            const response = await fetch(`http://localhost:3000/api/events/${event.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    user_id: userId,
-                    title: titleValue,
-                    description: descriptionValue,
-                    date: isoDate,
-                    time: timeValue,
-                    creator: creator,
-                    participants: participants,
-                    route_data: routeData,
-                    distance: distance
-                }),
+            const response = await fetch(`http://localhost:3000/api/user/${userId}`, {
+                credentials: 'include'
             });
-
             const result = await response.json();
             if (result.success) {
-                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
-                    credentials: 'include'
-                });
-                const eventResult = await eventResponse.json();
-                if (eventResult.success) {
-                    events = eventResult.events.map(event => ({
-                        ...event,
-                        date: new Date(event.date)
-                    }));
-                    renderCalendar();
-                    closeEventDetails();
-                    alert('Мероприятие успешно обновлено!');
-                } else {
-                    throw new Error('Не удалось обновить список мероприятий');
-                }
-            } else {
-                throw new Error(result.error || 'Ошибка при обновлении мероприятия');
+                const name = result.user.name || '';
+                const secondname = result.user.secondname || '';
+                creator = `${name} ${secondname}`.trim() || 'Неизвестный пользователь';
             }
         } catch (e) {
-            console.error('Ошибка при обновлении мероприятия:', e);
-            alert('Ошибка при обновлении мероприятия: ' + e.message);
+            console.error('Ошибка при получении данных пользователя:', e);
         }
     }
+    
+    let routeData = null;
+    if (routeDataValue && routeDataValue !== '') {
+        try {
+            routeData = JSON.parse(routeDataValue);
+        } catch (e) {
+            console.error('Ошибка при парсинге routeData:', e);
+            alert('Ошибка в данных маршрута.');
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch(`http://localhost:3000/api/events/${event.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                user_id: userId,
+                title: titleValue,
+                description: descriptionValue,
+                date: isoDate,
+                time: timeValue,
+                creator: creator,
+                participants: participants,
+                route_data: routeData,
+                distance: distance
+            }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                credentials: 'include'
+            });
+            const eventResult = await eventResponse.json();
+            if (eventResult.success) {
+                events = eventResult.events.map(event => ({
+                    ...event,
+                    date: new Date(event.date)
+                }));
+                renderCalendar();
+                closeEventDetails();
+                alert('Мероприятие успешно обновлено!');
+            } else {
+                throw new Error('Не удалось обновить список мероприятий');
+            }
+        } else {
+            throw new Error(result.error || 'Ошибка при обновлении мероприятия');
+        }
+    } catch (e) {
+        console.error('Ошибка при обновлении мероприятия:', e);
+        alert('Ошибка при обновлении мероприятия: ' + e.message);
+    }
+}
     
     async function deleteEvent(eventId) {
         if (!confirm('Вы уверены, что хотите удалить это мероприятие?')) {
@@ -679,6 +683,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         const participants = participantsValue.split(',').map(p => {
+            // Reverse lookup to get the original login from the full name
             for (let [login, fullName] of participantMap.entries()) {
                 if (fullName === p.trim()) {
                     return login;
@@ -687,6 +692,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             return p.trim();
         }).filter(p => p !== '');
         
+        console.log('Final participants list:', participants);
+
         if (participants.length > 0) {
             const invalidParticipants = participants.filter(p => !participantMap.has(p));
             if (invalidParticipants.length > 0) {
@@ -718,6 +725,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         try {
+            console.log('Sending event creation request with participants:', participants);
             const response = await fetch('http://localhost:3000/api/events', {
                 method: 'POST',
                 headers: {
@@ -738,6 +746,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
 
             const result = await response.json();
+            console.log('Event creation response:', result);
             if (result.success) {
                 const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
                     credentials: 'include'
@@ -755,6 +764,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     throw new Error('Не удалось обновить список мероприятий');
                 }
             } else {
+                alert(`Мероприятие создано (ID: ${result.eventId}), но возникли ошибки: ${result.details ? result.details.join(', ') : result.error}`);
                 throw new Error(result.error || 'Ошибка при создании мероприятия');
             }
         } catch (e) {

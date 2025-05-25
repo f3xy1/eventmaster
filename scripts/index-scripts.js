@@ -1,8 +1,12 @@
 document.addEventListener('DOMContentLoaded', async function() {
     const eventsContainer = document.getElementById('events-feed');
+    const notificationBtn = document.getElementById('notification-btn');
+    const notificationPopup = document.getElementById('notification-popup');
+    const notificationList = document.getElementById('notification-list');
     let events = [];
     let user = null;
     let filteredEvents = [];
+    let notifications = [];
 
     // Custom red marker icon
     const redMarkerIcon = L.icon({
@@ -94,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 console.log(`Событие ${event.id} (${event.date} ${event.time || '00:00'}, ${distance} км): Дата совпадает=${dateMatches}, Длина совпадает=${distanceMatches}`);
                 return dateMatches && distanceMatches;
             } catch (e) {
-                console.warn(`Ошибка при парсинге даты/времени для события ${event.id}:`, e);
+                console.warn(`Ошибка при парсinge даты/времени для события ${event.id}:`, e);
                 return false;
             }
         });
@@ -116,9 +120,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Пользователь авторизован:', user);
         } else {
             console.log('Пользователь не авторизован');
+            notificationBtn.style.display = 'none'; // Hide notification button if not logged in
         }
     } catch (e) {
         console.error('Ошибка при проверке сессии:', e);
+        notificationBtn.style.display = 'none'; // Hide notification button if session check fails
     }
 
     // Fetch all events
@@ -140,6 +146,228 @@ document.addEventListener('DOMContentLoaded', async function() {
         errorEl.className = 'no-events';
         errorEl.textContent = 'Не удалось загрузить мероприятия';
         eventsContainer.appendChild(errorEl);
+    }
+
+    // Fetch notifications
+    async function fetchNotifications() {
+        if (!user) return;
+        try {
+            const response = await fetch('http://localhost:3000/api/notifications', {
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (result.success) {
+                notifications = result.notifications || [];
+                console.log('Получено уведомлений:', notifications.length);
+                renderNotifications();
+                updateNotificationButton();
+            } else {
+                console.error('Ошибка при получении уведомлений:', result.error);
+            }
+        } catch (e) {
+            console.error('Ошибка при получении уведомлений:', e);
+        }
+    }
+
+    // Check for upcoming events (within 1 hour) and create notifications
+    async function checkUpcomingEvents() {
+        if (!user) return;
+        const now = new Date();
+        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+
+        // Load dismissed notification IDs from localStorage
+        let dismissedNotifications = JSON.parse(localStorage.getItem('dismissedNotifications') || '{}');
+        if (!dismissedNotifications[user.id]) {
+            dismissedNotifications[user.id] = new Set();
+        }
+
+        const upcomingEvents = events.filter(event => {
+            try {
+                const eventDateParts = event.date.split('-');
+                const eventDate = new Date(eventDateParts[0], eventDateParts[1] - 1, eventDateParts[2]);
+                if (isNaN(eventDate.getTime())) return false;
+
+                let eventDateTime = new Date(eventDate);
+                if (event.time) {
+                    const [hours, minutes] = event.time.split(':').map(Number);
+                    eventDateTime.setHours(hours, minutes, 0, 0);
+                } else {
+                    eventDateTime.setHours(0, 0, 0, 0);
+                }
+
+                // Check if the user is the creator or a participant
+                const isInvolved = event.user_id === user.id || event.participants.includes(user.login);
+                const isWithinHour = eventDateTime >= now && eventDateTime <= oneHourFromNow;
+                return isInvolved && isWithinHour;
+            } catch (e) {
+                console.warn(`Ошибка при парсinge даты/времени для события ${event.id}:`, e);
+                return false;
+            }
+        });
+
+        for (const event of upcomingEvents) {
+            const message = `Напоминание: мероприятие "${event.title}" начнется через час!`;
+            const notificationKey = `${event.id}_${eventDateTime.toISOString().split('T')[0]}`; // Unique key based on event ID and date
+
+            // Check if this notification has been dismissed
+            if (!dismissedNotifications[user.id].has(notificationKey)) {
+                // Check if a similar notification already exists and is unread
+                const existingNotification = notifications.find(n => n.message === message && !n.is_read);
+                if (!existingNotification) {
+                    try {
+                        const response = await fetch('http://localhost:3000/api/notifications', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                user_id: user.id,
+                                message: message
+                            })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            await fetchNotifications();
+                        }
+                    } catch (e) {
+                        console.error('Ошибка при создании уведомления о предстоящем мероприятии:', e);
+                    }
+                }
+            }
+        }
+    }
+
+    // Render notifications in the popup
+    function renderNotifications() {
+        notificationList.innerHTML = '';
+        if (notifications.length === 0) {
+            const emptyEl = document.createElement('p');
+            emptyEl.className = 'no-notifications';
+            emptyEl.textContent = 'Нет уведомлений';
+            notificationList.appendChild(emptyEl);
+            return;
+        }
+
+        notifications.forEach(notification => {
+            const notificationEl = document.createElement('div');
+            notificationEl.className = 'notification-item';
+            if (!notification.is_read) {
+                notificationEl.classList.add('unread');
+            }
+            notificationEl.textContent = notification.message;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    const response = await fetch(`http://localhost:3000/api/notifications/${notification.id}`, {
+                        method: 'DELETE',
+                        credentials: 'include'
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        // Mark as dismissed in localStorage
+                        let dismissedNotifications = JSON.parse(localStorage.getItem('dismissedNotifications') || '{}');
+                        if (!dismissedNotifications[user.id]) {
+                            dismissedNotifications[user.id] = new Set();
+                        }
+                        const eventMatch = notification.message.match(/мероприятие "([^"]+)"/);
+                        if (eventMatch) {
+                            const eventTitle = eventMatch[1];
+                            const event = events.find(e => e.title === eventTitle);
+                            if (event) {
+                                const notificationKey = `${event.id}_${new Date(event.date).toISOString().split('T')[0]}`;
+                                dismissedNotifications[user.id].add(notificationKey);
+                                localStorage.setItem('dismissedNotifications', JSON.stringify(dismissedNotifications));
+                            }
+                        }
+                        notifications = notifications.filter(n => n.id !== notification.id);
+                        renderNotifications();
+                        updateNotificationButton();
+                    } else {
+                        console.error('Ошибка при удалении уведомления:', result.error);
+                    }
+                } catch (e) {
+                    console.error('Ошибка при удалении уведомления:', e);
+                }
+            });
+
+            notificationEl.appendChild(deleteBtn);
+            notificationList.appendChild(notificationEl);
+        });
+    }
+
+    // Update notification button highlight
+    function updateNotificationButton() {
+        const hasUnread = notifications.some(n => !n.is_read);
+        if (hasUnread) {
+            notificationBtn.classList.add('unread');
+        } else {
+            notificationBtn.classList.remove('unread');
+        }
+    }
+
+    // Mark notifications as read when popup is opened
+    async function markNotificationsAsRead() {
+        const unreadNotifications = notifications.filter(n => !n.is_read);
+        for (const notification of unreadNotifications) {
+            try {
+                const response = await fetch(`http://localhost:3000/api/notifications/${notification.id}/read`, {
+                    method: 'PUT',
+                    credentials: 'include'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    notification.is_read = 1;
+                }
+            } catch (e) {
+                console.error('Ошибка при пометке уведомления как прочитанного:', e);
+            }
+        }
+        renderNotifications();
+        updateNotificationButton();
+    }
+
+    // Toggle notification popup
+    notificationBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent event from bubbling up unnecessarily
+        const isVisible = notificationPopup.style.display === 'flex';
+        if (isVisible) {
+            notificationPopup.style.display = 'none';
+        } else {
+            notificationPopup.style.display = 'flex';
+            markNotificationsAsRead();
+        }
+    });
+
+    // Ensure the icon click also triggers the button
+    const notificationIcon = document.querySelector('.notification-icon');
+    if (notificationIcon) {
+        notificationIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            notificationBtn.click(); // Trigger the button's click event
+        });
+    }
+
+    // Close popup when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!notificationPopup.contains(e.target) && e.target !== notificationBtn && e.target !== notificationIcon) {
+            notificationPopup.style.display = 'none';
+        }
+    });
+
+    // Periodically fetch notifications and check upcoming events
+    if (user) {
+        await fetchNotifications();
+        await checkUpcomingEvents();
+        setInterval(async () => {
+            await fetchNotifications();
+            await checkUpcomingEvents();
+        }, 60000); // Check every minute
     }
 
     // Add event listeners for real-time filtering
@@ -312,6 +540,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                             joinBtn.disabled = true;
                             joinBtn.textContent = 'Вы участвуете';
                             joinBtn.classList.add('join-btn-disabled');
+                            // Fetch notifications again to include the new one
+                            await fetchNotifications();
                         } else {
                             alert(result.error || 'Ошибка при присоединении к мероприятию');
                         }
