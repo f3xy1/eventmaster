@@ -296,6 +296,16 @@ header {
     border-radius: 4px;
 }
 
+.description-text {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    white-space: pre-wrap;
+    padding: 8px;
+    background: #f5f7fa;
+    border-radius: 4px;
+}
+
 .form-btn {
     background-color: #4a6fa5;
     color: white;

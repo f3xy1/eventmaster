@@ -100,6 +100,7 @@ nav ul li a {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
+    margin-top: 30px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s, box-shadow 0.2s;
     border-top: solid 8px #98bdfa;
@@ -127,6 +128,27 @@ nav ul li a {
     font-size: 1em;
     line-height: 1.4;
     margin-bottom: 15px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    white-space: pre-wrap;
+}
+
+.event-description-container .event-description.short,
+.event-description-container .event-description.full {
+    display: inline;
+}
+
+.event-description-container .toggle-description-btn {
+    background-color: white;
+    color: #666666;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.event-description-container .toggle-description-btn:hover {
+    color: #3267d6;
 }
 
 .event-map {
@@ -138,25 +160,25 @@ nav ul li a {
 
 .event-map-container {
     position: relative;
-    z-index: 1; /* Низкий z-index для контейнера карты */
-    overflow: hidden; /* Предотвращает выход элементов за пределы контейнера */
+    z-index: 1;
+    overflow: hidden;
 }
 
 .leaflet-control-container {
-    z-index: 2; /* z-index для элементов управления Leaflet ниже шапки и фильтров */
+    z-index: 2;
 }
 
 .leaflet-control-attribution {
-    z-index: 2; /* z-index для атрибуции ниже шапки и фильтров */
+    z-index: 2;
 }
 
 .leaflet-control-zoom, .leaflet-control-attribution {
-    position: relative !important; /* Отменяем абсолютное позиционирование, если оно мешает */
-    margin: 10px; /* Добавляем отступы для аккуратного вида */
+    position: relative !important;
+    margin: 10px;
 }
 
 .leaflet-container {
-    z-index: 1; /* z-index для всей карты */
+    z-index: 1;
 }
 
 .no-events {
@@ -201,11 +223,12 @@ nav ul li a {
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     position: fixed;
-    top: 90px; /* Below the header (header height ~50px with padding) */
+    top: 90px;
     left: 50%;
-    transform: translateX(-50%); /* Center horizontally */
+    transform: translateX(-50%);
     z-index: 900;
-    width: 100%; /* Ensure it respects max-width */
+    width: 100%;
+    margin-bottom: 700px;
 }
 
 .filter-group {
@@ -228,8 +251,18 @@ nav ul li a {
     width: 120px;
 }
 
+.filter-input[type="text"] {
+    width: 200px; /* Adjust width for search input */
+}
+
 .container {
     margin-top: 180px;
+}
+
+.checkbox {
+    position: fixed;
+    left: 355px;
+    top: 93px;
 }
 
 /* Notification Button Styles */
@@ -258,15 +291,15 @@ nav ul li a {
 }
 
 .notification-btn.unread {
-    background-color: #e74c3c; /* Highlight color for unread notifications */
-    animation: pulse 2s infinite; /* Pulsing animation for unread notifications */
+    background-color: #e74c3c;
+    animation: pulse 2s infinite;
 }
 
 .notification-icon {
     width: 24px;
     height: 24px;
-    filter: brightness(0) invert(1); /* Make the icon white */
-    pointer-events: none; /* Prevent the icon from capturing clicks */
+    filter: brightness(0) invert(1);
+    pointer-events: none;
 }
 
 /* Pulsing animation for unread notifications */
@@ -293,7 +326,7 @@ nav ul li a {
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     z-index: 1001;
-    display: none; /* Hidden by default */
+    display: none;
     flex-direction: column;
 }
 
@@ -322,7 +355,7 @@ nav ul li a {
 }
 
 .notification-item.unread {
-    background-color: #e6f0ff; /* Highlight unread notifications */
+    background-color: #e6f0ff;
     border-left: 4px solid #4285f4;
 }
 
@@ -349,7 +382,7 @@ nav ul li a {
     
     #events-feed {
         padding: 10px;
-        margin-top: 200px; /* Adjusted for mobile to account for stacked filters */
+        margin-top: 200px;
     }
     
     .event-card {
@@ -363,7 +396,7 @@ nav ul li a {
     
     .filter-section {
         padding: 10px;
-        top: 50px; /* Adjusted for smaller header on mobile */
+        top: 50px;
     }
     
     .filter-group {
@@ -373,6 +406,10 @@ nav ul li a {
     
     .filter-input {
         width: 100px;
+    }
+
+    .filter-input[type="text"] {
+        width: 150px; /* Adjusted for mobile */
     }
 
     .notification-btn {

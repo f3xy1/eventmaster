@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     filterSection.className = 'filter-section';
     filterSection.innerHTML = `
         <div class="filter-group">
+            <label for="filter-search">Поиск по названию:</label>
+            <input type="text" id="filter-search" class="filter-input" placeholder="Введите название">
+        </div>
+        <div class="filter-group">
             <label for="filter-date-from">Дата (от):</label>
             <input type="date" id="filter-date-from" value="2025-05-04" class="filter-input">
         </div>
@@ -42,6 +46,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             <label for="filter-max-distance">Макс. длина (км):</label>
             <input type="number" id="filter-max-distance" min="0" value="1000" step="0.1" class="filter-input">
         </div>
+        <div class="filter-group">
+            <label for="filter-past-events">Прошедшие:</label>
+            <input type="checkbox" id="filter-past-events" class="filter-input checkbox">
+        </div>
     `;
     eventsContainer.parentNode.insertBefore(filterSection, eventsContainer);
 
@@ -60,14 +68,18 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Apply filters and render
     function applyFilters() {
+        const filterSearch = document.getElementById('filter-search').value.toLowerCase();
         const filterDateFrom = document.getElementById('filter-date-from').value;
         const filterDateTo = document.getElementById('filter-date-to').value;
         const filterTime = document.getElementById('filter-time').value;
         const minDistance = parseFloat(document.getElementById('filter-min-distance').value) || 0;
         const maxDistance = parseFloat(document.getElementById('filter-max-distance').value) || Infinity;
+        const includePast = document.getElementById('filter-past-events').checked;
 
         const currentDateTimeFrom = filterDateFrom ? new Date(filterDateFrom + 'T' + filterTime) : new Date('2025-01-01T00:00');
         const currentDateTimeTo = filterDateTo ? new Date(filterDateTo + 'T' + filterTime) : new Date('2025-12-31T23:59');
+        const now = new Date('2025-06-08T11:16:00-04:00'); // Current date and time
+
         filteredEvents = events.filter(event => {
             try {
                 // Parse event date
@@ -95,8 +107,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const distance = event.distance || 0;
                 const distanceMatches = distance >= minDistance && distance <= maxDistance;
 
-                console.log(`Событие ${event.id} (${event.date} ${event.time || '00:00'}, ${distance} км): Дата совпадает=${dateMatches}, Длина совпадает=${distanceMatches}`);
-                return dateMatches && distanceMatches;
+                // Apply search filter
+                const titleMatches = !filterSearch || event.title.toLowerCase().includes(filterSearch);
+
+                // Apply past/upcoming filter
+                const isPast = eventDateTime < now;
+                const timeMatches = includePast ? isPast : !isPast;
+
+                console.log(`Событие ${event.id} (${event.date} ${event.time || '00:00'}, ${distance} км): Дата совпадает=${dateMatches}, Длина совпадает=${distanceMatches}, Название совпадает=${titleMatches}, Время совпадает=${timeMatches}`);
+                return dateMatches && distanceMatches && titleMatches && timeMatches;
             } catch (e) {
                 console.warn(`Ошибка при парсinge даты/времени для события ${event.id}:`, e);
                 return false;
@@ -172,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Check for upcoming events (within 1 hour) and create notifications
     async function checkUpcomingEvents() {
         if (!user) return;
-        const now = new Date();
+        const now = new Date('2025-06-08T11:16:00-04:00'); // Current date and time
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
         // Load dismissed notification IDs from localStorage
@@ -371,7 +390,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // Add event listeners for real-time filtering
-    ['filter-date-from', 'filter-date-to', 'filter-time', 'filter-min-distance', 'filter-max-distance'].forEach(id => {
+    ['filter-search', 'filter-date-from', 'filter-date-to', 'filter-time', 'filter-min-distance', 'filter-max-distance', 'filter-past-events'].forEach(id => {
         document.getElementById(id).addEventListener('input', debouncedApplyFilters);
     });
 
@@ -416,9 +435,33 @@ document.addEventListener('DOMContentLoaded', async function() {
             participantsEl.textContent = `Участники: ${participants.length}`;
             eventEl.appendChild(participantsEl);
 
-            const descriptionEl = document.createElement('p');
-            descriptionEl.className = 'event-description';
-            descriptionEl.textContent = event.description || 'Нет описания';
+            const descriptionEl = document.createElement('div');
+            descriptionEl.className = 'event-description-container';
+            const descriptionText = event.description || 'Нет описания';
+            if (descriptionText.length > 100) {
+                const shortText = descriptionText.substring(0, 100) + '...';
+                descriptionEl.innerHTML = `
+                    <span class="event-description short">${shortText}</span>
+                    <span class="event-description full" style="display: none;">${descriptionText}</span>
+                    <button class="toggle-description-btn">Развернуть</button>
+                `;
+                descriptionEl.querySelector('.toggle-description-btn').addEventListener('click', function() {
+                    const short = descriptionEl.querySelector('.event-description.short');
+                    const full = descriptionEl.querySelector('.event-description.full');
+                    const btn = this;
+                    if (full.style.display === 'none') {
+                        short.style.display = 'none';
+                        full.style.display = 'block';
+                        btn.textContent = 'Свернуть';
+                    } else {
+                        short.style.display = 'block';
+                        full.style.display = 'none';
+                        btn.textContent = 'Развернуть';
+                    }
+                });
+            } else {
+                descriptionEl.innerHTML = `<span class="event-description">${descriptionText}</span>`;
+            }
             eventEl.appendChild(descriptionEl);
 
             const distanceEl = document.createElement('p');
