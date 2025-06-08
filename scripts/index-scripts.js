@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const currentDateTimeFrom = filterDateFrom ? new Date(filterDateFrom + 'T' + filterTime) : new Date('2025-01-01T00:00');
         const currentDateTimeTo = filterDateTo ? new Date(filterDateTo + 'T' + filterTime) : new Date('2025-12-31T23:59');
-        const now = new Date('2025-06-08T11:16:00-04:00'); // Current date and time
+        const now = new Date('2025-06-08T12:15:00-04:00'); // Updated to current time
 
         filteredEvents = events.filter(event => {
             try {
@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Check for upcoming events (within 1 hour) and create notifications
     async function checkUpcomingEvents() {
         if (!user) return;
-        const now = new Date('2025-06-08T11:16:00-04:00'); // Current date and time
+        const now = new Date('2025-06-08T12:15:00-04:00'); // Updated to current time
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
         // Load dismissed notification IDs from localStorage
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             const participantsEl = document.createElement('p');
             participantsEl.className = 'event-participants';
-            const participants = Array.isArray(event.participants) ? event.participants : [];
+            let participants = Array.isArray(event.participants) ? event.participants : [];
             participantsEl.textContent = `Участники: ${participants.length}`;
             eventEl.appendChild(participantsEl);
 
@@ -563,36 +563,46 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
 
             // Add Participate button for authenticated non-creators
-            if (user && user.id !== event.user_id && !event.participants.includes(user.login)) {
+            if (user && user.id !== event.user_id) {
                 const joinBtn = document.createElement('button');
                 joinBtn.className = 'join-btn';
-                joinBtn.textContent = 'Участвовать';
+                // Initial state
+                const initialParticipants = Array.isArray(event.participants) ? event.participants : [];
+                let isParticipant = initialParticipants.includes(user.login);
+                joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
+                joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
+                if (isParticipant) {
+                    joinBtn.classList.add('join-btn-disabled');
+                }
+
                 joinBtn.addEventListener('click', async () => {
                     try {
-                        const response = await fetch(`http://localhost:3000/api/events/${event.id}/join`, {
+                        const url = `http://localhost:3000/api/events/${event.id}/${isParticipant ? 'leave' : 'join'}`;
+                        console.log(`Sending request to ${url}, isParticipant: ${isParticipant}`);
+                        const response = await fetch(url, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
+                            headers: { 'Content-Type': 'application/json' },
                             credentials: 'include'
                         });
                         const result = await response.json();
-                        if (result.success) {
-                            event.participants = result.participants;
-                            participantsEl.textContent = `Участники: ${result.participants.length}`;
-                            joinBtn.disabled = true;
-                            joinBtn.textContent = 'Вы участвуете';
-                            joinBtn.classList.add('join-btn-disabled');
-                            // Fetch notifications again to include the new one
-                            await fetchNotifications();
-                        } else {
-                            alert(result.error || 'Ошибка при присоединении к мероприятию');
-                        }
+                        console.log('Server response:', result);
+
+                        // Update participants and recalculate isParticipant
+                        event.participants = result.participants || [];
+                        participantsEl.textContent = `Участники: ${event.participants.length}`;
+                        isParticipant = event.participants.includes(user.login);
+                        joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
+                        joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
+                        joinBtn.classList.toggle('join-btn-disabled', isParticipant);
+                        await fetchNotifications();
+                        console.log('Updated participants:', event.participants);
                     } catch (e) {
-                        console.error('Ошибка при присоединении:', e);
-                        alert('Ошибка при присоединении к мероприятию');
+                        console.error(`Ошибка при ${isParticipant ? 'отказе' : 'присоединении'}:`, e);
+                        // Refetch event data to sync state
+                        await fetchEventData(event.id, joinBtn, participantsEl);
                     }
                 });
+
                 eventEl.appendChild(joinBtn);
             } else if (user && event.participants.includes(user.login)) {
                 const joinedLabel = document.createElement('p');
@@ -603,5 +613,30 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             eventsContainer.appendChild(eventEl);
         });
+    }
+
+    // Function to refetch event data and update UI
+    async function fetchEventData(eventId, joinBtn, participantsEl) {
+        try {
+            const response = await fetch(`http://localhost:3000/api/events/${eventId}`, {
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (result.success) {
+                const updatedEvent = result.events.find(e => e.id === eventId);
+                if (updatedEvent) {
+                    event.participants = updatedEvent.participants || [];
+                    participantsEl.textContent = `Участники: ${event.participants.length}`;
+                    const isParticipant = event.participants.includes(user.login);
+                    joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
+                    joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
+                    joinBtn.classList.toggle('join-btn-disabled', isParticipant);
+                    await fetchNotifications();
+                    console.log('Refetched participants:', event.participants);
+                }
+            }
+        } catch (e) {
+            console.error('Error refetching event data:', e);
+        }
     }
 });
