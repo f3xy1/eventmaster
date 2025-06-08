@@ -328,6 +328,8 @@ header {
 
 .delete-btn {
     background-color: #d32f2f;
+    margin: 0 auto;
+    margin-top: 10px;
 }
 
 .delete-btn:hover {

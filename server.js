@@ -275,6 +275,90 @@ app.get('/api/check-user-login/:login', isAuthenticated, (req, res) => {
     });
 });
 
+// API for joining or leaving an event
+app.post('/api/events/:id/:action', isAuthenticated, (req, res) => {
+    const eventId = req.params.id;
+    const action = req.params.action;
+    const login = req.session.login;
+    console.log(`Received request: eventId=${eventId}, action=${action}, login=${login}`);
+
+    db.get(`SELECT participants, user_id, title FROM Events WHERE id = ?`, [eventId], (err, row) => {
+        if (err) {
+            console.error('Database error:', err.message);
+            res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
+            return;
+        }
+        if (!row) {
+            console.error('Event not found:', eventId);
+            res.status(404).json({ error: 'Мероприятие не найдено' });
+            return;
+        }
+
+        let participants = [];
+        try {
+            participants = row.participants ? JSON.parse(row.participants) : [];
+            if (!Array.isArray(participants)) {
+                console.warn(`Invalid participants format for event ${eventId}:`, row.participants);
+                participants = [];
+            }
+        } catch (e) {
+            console.error(`Parsing error for participants in event ${eventId}:`, e.message);
+            participants = [];
+        }
+        console.log('Current participants:', participants);
+
+        if (action === 'join') {
+            if (participants.includes(login)) {
+                console.log('User already participating:', login);
+                res.status(400).json({ error: 'Вы уже участвуете в этом мероприятию' });
+                return;
+            }
+            participants.push(login);
+        } else if (action === 'leave') {
+            const index = participants.indexOf(login);
+            console.log('Checking if user is in participants:', { login, index, participants });
+            if (index === -1) {
+                console.log('User not found in participants:', login);
+                res.status(400).json({ error: 'Вы не участвуете в этом мероприятию' });
+                return;
+            }
+            participants.splice(index, 1);
+        } else {
+            res.status(400).json({ error: 'Недопустимое действие' });
+            return;
+        }
+
+        const stmt = db.prepare(`UPDATE Events SET participants = ? WHERE id = ?`);
+        stmt.run(JSON.stringify(participants), eventId, function (err) {
+            if (err) {
+                console.error('Update error:', err.message);
+                res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
+                return;
+            }
+
+            if (action === 'join') {
+                const creatorId = row.user_id;
+                const message = `${login} присоединился к вашему мероприятию "${row.title}"`;
+                const createdAt = new Date().toISOString();
+                const notificationStmt = db.prepare(`
+                    INSERT INTO Notifications (user_id, message, created_at)
+                    VALUES (?, ?, ?)
+                `);
+                notificationStmt.run(creatorId, message, createdAt, (err) => {
+                    if (err) {
+                        console.error('Notification error:', err.message);
+                    }
+                });
+                notificationStmt.finalize();
+            }
+
+            console.log('Update successful, new participants:', participants);
+            res.json({ success: true, participants });
+        });
+        stmt.finalize();
+    });
+});
+
 // API для обновления профиля пользователя
 app.put('/api/user/:id', isAuthenticated, (req, res) => {
     const userId = req.params.id;
@@ -553,90 +637,6 @@ app.put('/api/events/:id', isAuthenticated, (req, res) => {
                 }
             }
         );
-        stmt.finalize();
-    });
-});
-
-// API for joining or leaving an event
-app.post('/api/events/:id/:action', isAuthenticated, (req, res) => {
-    const eventId = req.params.id;
-    const action = req.params.action;
-    const login = req.session.login;
-    console.log(`Received request: eventId=${eventId}, action=${action}, login=${login}`);
-
-    db.get(`SELECT participants, user_id, title FROM Events WHERE id = ?`, [eventId], (err, row) => {
-        if (err) {
-            console.error('Database error:', err.message);
-            res.status(500).json({ error: 'Ошибка при проверке мероприятия' });
-            return;
-        }
-        if (!row) {
-            console.error('Event not found:', eventId);
-            res.status(404).json({ error: 'Мероприятие не найдено' });
-            return;
-        }
-
-        let participants = [];
-        try {
-            participants = row.participants ? JSON.parse(row.participants) : [];
-            if (!Array.isArray(participants)) {
-                console.warn(`Invalid participants format for event ${eventId}:`, row.participants);
-                participants = [];
-            }
-        } catch (e) {
-            console.error(`Parsing error for participants in event ${eventId}:`, e.message);
-            participants = [];
-        }
-        console.log('Current participants:', participants);
-
-        if (action === 'join') {
-            if (participants.includes(login)) {
-                console.log('User already participating:', login);
-                res.status(400).json({ error: 'Вы уже участвуете в этом мероприятию' });
-                return;
-            }
-            participants.push(login);
-        } else if (action === 'leave') {
-            const index = participants.indexOf(login);
-            console.log('Checking if user is in participants:', { login, index, participants });
-            if (index === -1) {
-                console.log('User not found in participants:', login);
-                res.status(400).json({ error: 'Вы не участвуете в этом мероприятию' });
-                return;
-            }
-            participants.splice(index, 1);
-        } else {
-            res.status(400).json({ error: 'Недопустимое действие' });
-            return;
-        }
-
-        const stmt = db.prepare(`UPDATE Events SET participants = ? WHERE id = ?`);
-        stmt.run(JSON.stringify(participants), eventId, function (err) {
-            if (err) {
-                console.error('Update error:', err.message);
-                res.status(500).json({ error: 'Ошибка при обновлении мероприятия' });
-                return;
-            }
-
-            if (action === 'join') {
-                const creatorId = row.user_id;
-                const message = `${login} присоединился к вашему мероприятию "${row.title}"`;
-                const createdAt = new Date().toISOString();
-                const notificationStmt = db.prepare(`
-                    INSERT INTO Notifications (user_id, message, created_at)
-                    VALUES (?, ?, ?)
-                `);
-                notificationStmt.run(creatorId, message, createdAt, (err) => {
-                    if (err) {
-                        console.error('Notification error:', err.message);
-                    }
-                });
-                notificationStmt.finalize();
-            }
-
-            console.log('Update successful, new participants:', participants);
-            res.json({ success: true, participants });
-        });
         stmt.finalize();
     });
 });

@@ -286,6 +286,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
             }
 
+            // Use the login from the session check instead of req.session.login
+            const currentLogin = userId ? (await (await fetch(`http://localhost:3000/api/check-session`, { credentials: 'include' })).json()).login : null;
+
             detailsContent.innerHTML = `
                 <div class="form-group">
                     <label>Дата:</label>
@@ -326,11 +329,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <button id="deleteEventBtn" class="form-btn delete-btn">Удалить</button>
                 </div>
                 ` : ''}
+                ${!isOrganizer && currentLogin && event.participants && event.participants.includes(currentLogin) ? `
+                <div class="form-group action-buttons">
+                    <button id="leaveEventBtn" class="form-btn delete-btn">Отказаться</button>
+                </div>
+                ` : ''}
             `;
             
             if (isOrganizer) {
                 document.getElementById('editEventBtn').addEventListener('click', () => toggleEventDetailsMode('edit', event));
                 document.getElementById('deleteEventBtn').addEventListener('click', () => deleteEvent(event.id));
+            } else if (!isOrganizer && currentLogin && event.participants && event.participants.includes(currentLogin)) {
+                document.getElementById('leaveEventBtn').addEventListener('click', () => leaveEvent(event.id));
             }
         } else {
             originalRouteData = event.route_data ? JSON.stringify(event.route_data) : '';
@@ -650,6 +660,46 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch (e) {
             console.error('Ошибка при удалении мероприятия:', e);
             alert('Ошибка при удалении мероприятия: ' + e.message);
+        }
+    }
+    
+    async function leaveEvent(eventId) {
+        if (!confirm('Вы уверены, что хотите отказаться от участия в мероприятии?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`http://localhost:3000/api/events/${eventId}/leave`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                const eventResponse = await fetch(`http://localhost:3000/api/events/${userId}`, {
+                    credentials: 'include'
+                });
+                const eventResult = await eventResponse.json();
+                if (eventResult.success) {
+                    events = eventResult.events.map(event => ({
+                        ...event,
+                        date: new Date(event.date)
+                    }));
+                    renderCalendar();
+                    closeEventDetails();
+                    alert('Вы успешно отказались от участия в мероприятии!');
+                } else {
+                    throw new Error('Не удалось обновить список мероприятий');
+                }
+            } else {
+                throw new Error(result.error || 'Ошибка при отказе от участия');
+            }
+        } catch (e) {
+            console.error('Ошибка при отказе от участия:', e);
+            alert('Ошибка при отказе от участия: ' + e.message);
         }
     }
     
