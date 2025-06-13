@@ -868,6 +868,18 @@ app.put('/api/notifications/:id/read', isAuthenticated, (req, res) => {
     });
 });
 
+// New API to get all users
+app.get('/api/all-users', isAuthenticated, (req, res) => {
+    db.all(`SELECT id, login, name, secondname FROM Users`, [], (err, rows) => {
+        if (err) {
+            console.error('Ошибка при получении списка пользователей:', err.message);
+            res.status(500).json({ error: 'Ошибка при получении списка пользователей' });
+            return;
+        }
+        res.json({ success: true, users: rows });
+    });
+});
+
 // Static files
 app.use(express.static(__dirname));
 

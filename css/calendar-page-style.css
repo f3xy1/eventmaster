@@ -270,6 +270,7 @@ header {
 
 .form-group {
     margin-bottom: 15px;
+    position: relative;
 }
 
 .form-group label {
@@ -478,6 +479,33 @@ header {
     color: #d32f2f;
     font-size: 0.9em;
     margin-top: 5px;
+}
+
+.participants-dropdown {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    z-index: 1001;
+    width: 100%;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.dropdown-user {
+    padding: 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.dropdown-user:hover {
+    background-color: #f5f7fa;
+}
+
+.dropdown-user .checkmark {
+    color: #2e7d32;
+    margin-left: 5px;
 }
 
 /* Adjust for mobile devices */
