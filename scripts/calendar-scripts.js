@@ -593,8 +593,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             distance = parseFloat(routeDistanceText.replace(' км', ''));
         }
         
-        const participants = Array.from(participantMap.keys());
-        
         let creator = 'Неизвестный пользователь';
         if (userId) {
             try {
@@ -625,7 +623,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     date: isoDate,
                     time: timeValue,
                     creator: creator,
-                    participants: participants,
+                    participants: Array.from(participantMap.keys()), // Send participants for invitations
                     route_data: routeDataValue ? JSON.parse(routeDataValue) : null,
                     distance: distance
                 })
@@ -642,7 +640,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         date: new Date(isoDate),
                         time: timeValue,
                         creator: creator,
-                        participants: participants,
+                        participants: [], // Participants will be added only after acceptance
                         route_data: routeDataValue ? JSON.parse(routeDataValue) : null,
                         distance: distance
                     };
@@ -680,8 +678,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             distance = parseFloat(routeDistanceText.replace(' км', ''));
         }
         
-        const participants = Array.from(participantMap.keys());
-        
         let creator = 'Неизвестный пользователь';
         if (userId) {
             try {
@@ -712,7 +708,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     date: isoDate,
                     time: timeValue,
                     creator: creator,
-                    participants: participants,
+                    participants: Array.from(participantMap.keys()), // Send participants for invitations
                     route_data: routeDataValue ? JSON.parse(routeDataValue) : null,
                     distance: distance
                 })
@@ -728,7 +724,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     date: new Date(isoDate),
                     time: timeValue,
                     creator: creator,
-                    participants: participants,
+                    participants: [], // Participants will be added only after acceptance
                     route_data: routeDataValue ? JSON.parse(routeDataValue) : null,
                     distance: distance
                 };

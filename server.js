@@ -94,7 +94,7 @@ db.serialize(() => {
         if (!columnNames.includes('secondname')) {
             db.run(`ALTER TABLE Users ADD COLUMN secondname TEXT`, (err) => {
                 if (err) {
-                    console.error('Ошибка при добавлении столбца secondname:', err.message);
+                    console.error('Ошибка при добавления столбца secondname:', err.message);
                 }
             });
         }
@@ -470,11 +470,11 @@ app.post('/api/events', isAuthenticated, (req, res) => {
         INSERT INTO Events (user_id, title, description, date, time, creator, participants, route_data, distance)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const participantsArray = Array.isArray(participants) ? participants.filter(p => p && typeof p === 'string') : [];
-    const participantsJson = JSON.stringify(participantsArray);
+    const participantsArray = Array.isArray(participants) ? participants.filter(p => p && typeof p === 'string' && p !== creator) : [];
+    const participantsJson = JSON.stringify([]); // Always initialize with empty participants
     const routeDataJson = route_data ? JSON.stringify(route_data) : null;
 
-    console.log('Participants array after processing:', participantsArray);
+    console.log('Participants array after processing (excluding creator):', participantsArray);
 
     db.run(insertEventQuery, [user_id, title, description || null, date, time || null, creator, participantsJson, routeDataJson, distance || null], function (err) {
         if (err) {
@@ -503,32 +503,13 @@ app.post('/api/events', isAuthenticated, (req, res) => {
                         return resolve();
                     }
 
-                    // Check if user is already a participant
-                    db.get('SELECT participants FROM Events WHERE id = ?', [eventId], (err, event) => {
+                    const message = `Вы были приглашены на мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
+                    createNotification(user.id, message, 'invitation', eventId, (err) => {
                         if (err) {
-                            console.error(`Database error checking participants for event ${eventId}:`, err);
-                            return reject(new Error(`Database error for event ${eventId}: ${err.message}`));
+                            console.error(`Failed to create notification for user ${login}:`, err);
+                            return reject(new Error(`Notification creation failed for ${login}: ${err.message}`));
                         }
-                        let eventParticipants = [];
-                        try {
-                            eventParticipants = event ? JSON.parse(event.participants) : [];
-                        } catch (e) {
-                            console.error(`Error parsing participants for event ${eventId}:`, e);
-                        }
-                        if (eventParticipants.includes(login)) {
-                            console.log(`User ${login} is already a participant in event ${eventId}, skipping invitation.`);
-                            return resolve();
-                        }
-
-                        console.log(`Found user ${login} with ID: ${user.id}`);
-                        const message = `Вы были приглашены на мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
-                        createNotification(user.id, message, 'invitation', eventId, (err) => {
-                            if (err) {
-                                console.error(`Failed to create notification for user ${login}:`, err);
-                                return reject(new Error(`Notification creation failed for ${login}: ${err.message}`));
-                            }
-                            resolve();
-                        });
+                        resolve();
                     });
                 });
             });
@@ -598,14 +579,12 @@ app.put('/api/events/:id', isAuthenticated, (req, res) => {
         }
         console.log(`Current participants from database: ${JSON.stringify(currentParticipants)}`);
 
-        const newParticipants = Array.isArray(participants) ? participants.filter(p => p && typeof p === 'string') : [];
-        console.log(`New participants after processing: ${JSON.stringify(newParticipants)}`);
-
-        const addedParticipants = newParticipants.filter(p => !currentParticipants.includes(p));
-        console.log(`Added participants: ${JSON.stringify(addedParticipants)}`);
-
-        const newParticipantsJson = JSON.stringify(newParticipants);
+        const newParticipantsArray = Array.isArray(participants) ? participants.filter(p => p && typeof p === 'string' && p !== creator) : [];
+        const newParticipantsJson = JSON.stringify([]); // Always initialize with empty participants for update
         const routeDataJson = route_data ? JSON.stringify(route_data) : null;
+
+        const addedParticipants = newParticipantsArray.filter(p => !currentParticipants.includes(p));
+        console.log(`Added participants: ${JSON.stringify(addedParticipants)}`);
 
         const stmt = db.prepare(`
             UPDATE Events
@@ -642,13 +621,6 @@ app.put('/api/events/:id', isAuthenticated, (req, res) => {
                                         return resolve();
                                     }
 
-                                    // Check if user is already a participant
-                                    if (currentParticipants.includes(login)) {
-                                        console.log(`User ${login} is already a participant in event ${eventId}, skipping invitation.`);
-                                        return resolve();
-                                    }
-
-                                    console.log(`Found user ${login} with ID: ${user.id}`);
                                     const message = `Вы были приглашены на мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
                                     createNotification(user.id, message, 'invitation', eventId, (err) => {
                                         if (err) {
