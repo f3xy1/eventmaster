@@ -125,13 +125,39 @@ db.serialize(() => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             message TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT 'reminder',
+            event_id INTEGER,
             is_read INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES Users(id)
+            FOREIGN KEY (user_id) REFERENCES Users(id),
+            FOREIGN KEY (event_id) REFERENCES Events(id)
         )
     `, (err) => {
         if (err) {
             console.error('Ошибка при создании таблицы Notifications:', err.message);
+        }
+    });
+
+    // Check if type and event_id columns exist in Notifications table
+    db.all("PRAGMA table_info(Notifications)", (err, columns) => {
+        if (err) {
+            console.error('Ошибка при проверке структуры таблицы Notifications:', err.message);
+            return;
+        }
+        const columnNames = columns.map(col => col.name);
+        if (!columnNames.includes('type')) {
+            db.run(`ALTER TABLE Notifications ADD COLUMN type TEXT NOT NULL DEFAULT 'reminder'`, (err) => {
+                if (err) {
+                    console.error('Ошибка при добавления столбца type:', err.message);
+                }
+            });
+        }
+        if (!columnNames.includes('event_id')) {
+            db.run(`ALTER TABLE Notifications ADD COLUMN event_id INTEGER`, (err) => {
+                if (err) {
+                    console.error('Ошибка при добавления столбца event_id:', err.message);
+                }
+            });
         }
     });
 });
@@ -142,6 +168,45 @@ function isAuthenticated(req, res, next) {
         return next();
     }
     res.status(401).json({ error: 'Не авторизован' });
+}
+
+// Wrapper for notification creation to log all notifications
+function createNotification(userId, message, type, eventId, callback) {
+    const createdAt = new Date().toISOString();
+    console.log(`Attempting to create notification: user_id=${userId}, message="${message}", type=${type}, event_id=${eventId}, created_at=${createdAt}`);
+    db.get('SELECT id FROM Notifications WHERE user_id = ? AND event_id = ? AND type = ?', [userId, eventId, type], (err, existing) => {
+        if (err) {
+            console.error(`Database error checking existing notification:`, err);
+            return callback(err);
+        }
+        if (existing) {
+            console.log(`Notification already exists for user ${userId} and event ${eventId}, skipping creation`);
+            return callback(null, existing.id);
+        }
+        db.run(
+            'INSERT INTO Notifications (user_id, message, type, event_id, is_read, created_at) VALUES (?, ?, ?, ?, 0, ?)',
+            [userId, message, type, eventId, createdAt],
+            function (err) {
+                if (err) {
+                    console.error(`Failed to create notification:`, err);
+                    callback(err);
+                } else {
+                    const notificationId = this.lastID;
+                    console.log(`Notification created with ID: ${notificationId}`);
+                    db.get('SELECT * FROM Notifications WHERE id = ?', [notificationId], (err, row) => {
+                        if (err) {
+                            console.error(`Error verifying notification ${notificationId}:`, err);
+                        } else if (row) {
+                            console.log(`Verified notification:`, row);
+                        } else {
+                            console.error(`Notification ${notificationId} not found after insertion`);
+                        }
+                        callback(null, notificationId);
+                    });
+                }
+            }
+        );
+    });
 }
 
 // API для регистрации пользователя
@@ -336,21 +401,14 @@ app.post('/api/events/:id/:action', isAuthenticated, (req, res) => {
                 return;
             }
 
-            if (action === 'join') {
-                const creatorId = row.user_id;
-                const message = `${login} присоединился к вашему мероприятию "${row.title}"`;
-                const createdAt = new Date().toISOString();
-                const notificationStmt = db.prepare(`
-                    INSERT INTO Notifications (user_id, message, created_at)
-                    VALUES (?, ?, ?)
-                `);
-                notificationStmt.run(creatorId, message, createdAt, (err) => {
-                    if (err) {
-                        console.error('Notification error:', err.message);
-                    }
-                });
-                notificationStmt.finalize();
-            }
+            // Send response notification to event creator
+            const creatorId = row.user_id;
+            const message = `${login} ${action === 'join' ? 'присоединился к' : 'отказался от участия в'} вашему мероприятию "${row.title}"`;
+            createNotification(creatorId, message, 'response', eventId, (err) => {
+                if (err) {
+                    console.error('Notification error:', err.message);
+                }
+            });
 
             console.log('Update successful, new participants:', participants);
             res.json({ success: true, participants });
@@ -434,7 +492,7 @@ app.post('/api/events', isAuthenticated, (req, res) => {
 
         const notificationPromises = participantsArray.map(login => {
             return new Promise((resolve, reject) => {
-                console.log(`Looking up user with login: ${login}`);
+                console.log(`Processing notification for login: ${login}`);
                 db.get('SELECT id FROM Users WHERE login = ?', [login], (err, user) => {
                     if (err) {
                         console.error(`Database error looking up user ${login}:`, err);
@@ -442,37 +500,36 @@ app.post('/api/events', isAuthenticated, (req, res) => {
                     }
                     if (!user) {
                         console.warn(`User ${login} not found in database, skipping notification.`);
-                        return resolve(); // Resolve even if user not found to allow partial success
+                        return resolve();
                     }
 
-                    console.log(`Found user ${login} with ID: ${user.id}`);
-                    const message = `Вы были добавлены в мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
-                    db.run(
-                        'INSERT INTO Notifications (user_id, message, is_read, created_at) VALUES (?, ?, 0, ?)',
-                        [user.id, message, new Date().toISOString()],
-                        function (err) {
+                    // Check if user is already a participant
+                    db.get('SELECT participants FROM Events WHERE id = ?', [eventId], (err, event) => {
+                        if (err) {
+                            console.error(`Database error checking participants for event ${eventId}:`, err);
+                            return reject(new Error(`Database error for event ${eventId}: ${err.message}`));
+                        }
+                        let eventParticipants = [];
+                        try {
+                            eventParticipants = event ? JSON.parse(event.participants) : [];
+                        } catch (e) {
+                            console.error(`Error parsing participants for event ${eventId}:`, e);
+                        }
+                        if (eventParticipants.includes(login)) {
+                            console.log(`User ${login} is already a participant in event ${eventId}, skipping invitation.`);
+                            return resolve();
+                        }
+
+                        console.log(`Found user ${login} with ID: ${user.id}`);
+                        const message = `Вы были приглашены на мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
+                        createNotification(user.id, message, 'invitation', eventId, (err) => {
                             if (err) {
                                 console.error(`Failed to create notification for user ${login}:`, err);
                                 return reject(new Error(`Notification creation failed for ${login}: ${err.message}`));
                             }
-                            const notificationId = this.lastID;
-                            console.log(`Successfully created notification for user ${login} (ID: ${user.id}) with notification ID: ${notificationId}`);
-
-                            // Verify the notification was actually inserted
-                            db.get('SELECT * FROM Notifications WHERE id = ?', [notificationId], (err, row) => {
-                                if (err) {
-                                    console.error(`Error verifying notification ${notificationId}:`, err);
-                                    return reject(new Error(`Verification failed for notification ${notificationId}: ${err.message}`));
-                                }
-                                if (!row) {
-                                    console.error(`Notification ${notificationId} was not found in the database after insertion`);
-                                    return reject(new Error(`Notification ${notificationId} was not persisted in the database`));
-                                }
-                                console.log(`Verified notification ${notificationId} exists in the database`);
-                                resolve();
-                            });
-                        }
-                    );
+                            resolve();
+                        });
+                    });
                 });
             });
         });
@@ -574,7 +631,7 @@ app.put('/api/events/:id', isAuthenticated, (req, res) => {
                     if (addedParticipants.length > 0) {
                         const notificationPromises = addedParticipants.map(login => {
                             return new Promise((resolve, reject) => {
-                                console.log(`Looking up user with login: ${login} for notification`);
+                                console.log(`Processing notification for login: ${login}`);
                                 db.get('SELECT id FROM Users WHERE login = ?', [login], (err, user) => {
                                     if (err) {
                                         console.error(`Database error looking up user ${login}:`, err);
@@ -585,33 +642,21 @@ app.put('/api/events/:id', isAuthenticated, (req, res) => {
                                         return resolve();
                                     }
 
+                                    // Check if user is already a participant
+                                    if (currentParticipants.includes(login)) {
+                                        console.log(`User ${login} is already a participant in event ${eventId}, skipping invitation.`);
+                                        return resolve();
+                                    }
+
                                     console.log(`Found user ${login} with ID: ${user.id}`);
-                                    const message = `Вы были добавлены в мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
-                                    db.run(
-                                        'INSERT INTO Notifications (user_id, message, is_read, created_at) VALUES (?, ?, 0, ?)',
-                                        [user.id, message, new Date().toISOString()],
-                                        function (err) {
-                                            if (err) {
-                                                console.error(`Failed to create notification for user ${login}:`, err);
-                                                return reject(new Error(`Notification creation failed for ${login}: ${err.message}`));
-                                            }
-                                            const notificationId = this.lastID;
-                                            console.log(`Successfully created notification for user ${login} (ID: ${user.id}) with notification ID: ${notificationId}`);
-                                            // Verify the notification was actually inserted
-                                            db.get('SELECT * FROM Notifications WHERE id = ?', [notificationId], (err, row) => {
-                                                if (err) {
-                                                    console.error(`Error verifying notification ${notificationId}:`, err);
-                                                    return reject(new Error(`Verification failed for notification ${notificationId}: ${err.message}`));
-                                                }
-                                                if (!row) {
-                                                    console.error(`Notification ${notificationId} was not found in the database after insertion`);
-                                                    return reject(new Error(`Notification ${notificationId} was not persisted in the database`));
-                                                }
-                                                console.log(`Verified notification ${notificationId} exists in the database`);
-                                                resolve();
-                                            });
+                                    const message = `Вы были приглашены на мероприятие "${title}", запланированное на ${date}${time ? ' в ' + time : ''}.`;
+                                    createNotification(user.id, message, 'invitation', eventId, (err) => {
+                                        if (err) {
+                                            console.error(`Failed to create notification for user ${login}:`, err);
+                                            return reject(new Error(`Notification creation failed for ${login}: ${err.message}`));
                                         }
-                                    );
+                                        resolve();
+                                    });
                                 });
                             });
                         });
@@ -664,6 +709,12 @@ app.delete('/api/events/:id', isAuthenticated, (req, res) => {
                 console.error('Ошибка при удалении мероприятия:', err.message);
                 res.status(500).json({ error: 'Ошибка при удалении мероприятия' });
             } else {
+                // Delete related notifications
+                db.run(`DELETE FROM Notifications WHERE event_id = ?`, [eventId], (err) => {
+                    if (err) {
+                        console.error('Ошибка при удалении уведомлений мероприятия:', err.message);
+                    }
+                });
                 res.json({ success: true });
             }
         });
@@ -785,21 +836,15 @@ app.get('/api/notifications', isAuthenticated, (req, res) => {
 
 // API для создания уведомления
 app.post('/api/notifications', isAuthenticated, (req, res) => {
-    const { user_id, message } = req.body;
-    const createdAt = new Date().toISOString();
-    const stmt = db.prepare(`
-        INSERT INTO Notifications (user_id, message, created_at)
-        VALUES (?, ?, ?)
-    `);
-    stmt.run(user_id, message, createdAt, function (err) {
+    const { user_id, message, type = 'reminder', event_id } = req.body;
+    createNotification(user_id, message, type, event_id || null, (err, notificationId) => {
         if (err) {
             console.error('Ошибка при создании уведомления:', err.message);
             res.status(500).json({ error: 'Ошибка при создании уведомления' });
         } else {
-            res.json({ success: true, notificationId: this.lastID });
+            res.json({ success: true, notificationId });
         }
     });
-    stmt.finalize();
 });
 
 // API для удаления уведомления

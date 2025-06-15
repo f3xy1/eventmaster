@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const currentDateTimeFrom = filterDateFrom ? new Date(filterDateFrom + 'T' + filterTime) : new Date('2025-01-01T00:00');
         const currentDateTimeTo = filterDateTo ? new Date(filterDateTo + 'T' + filterTime) : new Date('2025-12-31T23:59');
-        const now = new Date('2025-06-08T12:15:00-04:00'); // Updated to current time
+        const now = new Date('2025-06-15T11:19:00-04:00'); // Updated to current time
 
         filteredEvents = events.filter(event => {
             try {
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 // Apply past/upcoming filter
                 const isPast = eventDateTime < now;
-                const timeMatches = includePast ? isPast : !isPast;
+                const timeMatches = includePast ? true : !isPast;
 
                 console.log(`Событие ${event.id} (${event.date} ${event.time || '00:00'}, ${distance} км): Дата совпадает=${dateMatches}, Длина совпадает=${distanceMatches}, Название совпадает=${titleMatches}, Время совпадает=${timeMatches}`);
                 return dateMatches && distanceMatches && titleMatches && timeMatches;
@@ -139,11 +139,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Пользователь авторизован:', user);
         } else {
             console.log('Пользователь не авторизован');
-            notificationBtn.style.display = 'none'; // Hide notification button if not logged in
+            notificationBtn.style.display = 'none';
         }
     } catch (e) {
         console.error('Ошибка при проверке сессии:', e);
-        notificationBtn.style.display = 'none'; // Hide notification button if session check fails
+        notificationBtn.style.display = 'none';
     }
 
     // Fetch all events
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (result.success) {
             events = result.events || [];
             console.log('Получено мероприятий:', events.length);
-            applyFilters(); // Initial call to load events
+            applyFilters();
         } else {
             throw new Error(result.error || 'Ошибка при загрузке мероприятий');
         }
@@ -191,10 +191,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Check for upcoming events (within 1 hour) and create notifications
     async function checkUpcomingEvents() {
         if (!user) return;
-        const now = new Date('2025-06-08T12:15:00-04:00'); // Updated to current time
+        const now = new Date('2025-06-15T11:19:00-04:00');
         const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
 
-        // Load dismissed notification IDs from localStorage
         let dismissedNotifications = JSON.parse(localStorage.getItem('dismissedNotifications') || '{}');
         if (!dismissedNotifications[user.id]) {
             dismissedNotifications[user.id] = new Set();
@@ -214,7 +213,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     eventDateTime.setHours(0, 0, 0, 0);
                 }
 
-                // Check if the user is the creator or a participant
                 const isInvolved = event.user_id === user.id || event.participants.includes(user.login);
                 const isWithinHour = eventDateTime >= now && eventDateTime <= oneHourFromNow;
                 return isInvolved && isWithinHour;
@@ -226,12 +224,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         for (const event of upcomingEvents) {
             const message = `Напоминание: мероприятие "${event.title}" начнется через час!`;
-            const notificationKey = `${event.id}_${eventDateTime.toISOString().split('T')[0]}`; // Unique key based on event ID and date
-
-            // Check if this notification has been dismissed
+            const notificationKey = `${event.id}_${event.date}`;
             if (!dismissedNotifications[user.id].has(notificationKey)) {
-                // Check if a similar notification already exists and is unread
-                const existingNotification = notifications.find(n => n.message === message && !n.is_read);
+                const existingNotification = notifications.find(n => n.message === message && !n.is_read && n.type === 'reminder');
                 if (!existingNotification) {
                     try {
                         const response = await fetch('http://localhost:3000/api/notifications', {
@@ -242,7 +237,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                             credentials: 'include',
                             body: JSON.stringify({
                                 user_id: user.id,
-                                message: message
+                                message: message,
+                                type: 'reminder',
+                                event_id: event.id
                             })
                         });
                         const result = await response.json();
@@ -257,8 +254,57 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    // Handle invitation response
+    async function handleInvitationResponse(notification, action) {
+        if (!notification.event_id) {
+            console.error('No event_id in notification:', notification);
+            return;
+        }
+        try {
+            const response = await fetch(`http://localhost:3000/api/events/${notification.event_id}/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (result.success) {
+                // Update event in local state
+                const event = events.find(e => e.id === notification.event_id);
+                if (event) {
+                    event.participants = result.participants || [];
+                    applyFilters(); // Re-render events to reflect participant changes
+                }
+                // Mark notification as handled locally and delete
+                notification.is_handled = true; // Local flag to trigger UI update
+                await fetch(`http://localhost:3000/api/notifications/${notification.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                notifications = notifications.filter(n => n.id !== notification.id);
+                renderNotifications(); // Immediate re-render
+                await fetchNotifications(); // Refresh notifications
+            } else if (action === 'join' && result.error && result.error.includes('already participating')) {
+                // Handle case where user is already a participant
+                console.log(`User ${user.login} is already a participant, deleting invitation notification ${notification.id}`);
+                notification.is_handled = true; // Set handled flag for UI update
+                await fetch(`http://localhost:3000/api/notifications/${notification.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                notifications = notifications.filter(n => n.id !== notification.id);
+                renderNotifications(); // Immediate re-render
+                await fetchNotifications(); // Refresh notifications
+            } else {
+                console.error(`Ошибка при ${action === 'join' ? 'присоединении' : 'отказе'}:`, result.error);
+            }
+        } catch (e) {
+            console.error(`Ошибка при ${action === 'join' ? 'присоединении' : 'отказе'}:`, e);
+        }
+    }
+
     // Render notifications in the popup
     function renderNotifications() {
+        console.log('Rendering notifications:', notifications);
         notificationList.innerHTML = '';
         if (notifications.length === 0) {
             const emptyEl = document.createElement('p');
@@ -269,52 +315,84 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         notifications.forEach(notification => {
+            console.log(`Processing notification: ID=${notification.id}, Type=${notification.type}, EventID=${notification.event_id}, IsRead=${notification.is_read}, Message="${notification.message}"`);
             const notificationEl = document.createElement('div');
             notificationEl.className = 'notification-item';
             if (!notification.is_read) {
                 notificationEl.classList.add('unread');
             }
-            notificationEl.textContent = notification.message;
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.innerHTML = '×';
-            deleteBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                try {
-                    const response = await fetch(`http://localhost:3000/api/notifications/${notification.id}`, {
-                        method: 'DELETE',
-                        credentials: 'include'
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        // Mark as dismissed in localStorage
-                        let dismissedNotifications = JSON.parse(localStorage.getItem('dismissedNotifications') || '{}');
-                        if (!dismissedNotifications[user.id]) {
-                            dismissedNotifications[user.id] = new Set();
-                        }
-                        const eventMatch = notification.message.match(/мероприятие "([^"]+)"/);
-                        if (eventMatch) {
-                            const eventTitle = eventMatch[1];
-                            const event = events.find(e => e.title === eventTitle);
-                            if (event) {
-                                const notificationKey = `${event.id}_${new Date(event.date).toISOString().split('T')[0]}`;
-                                dismissedNotifications[user.id].add(notificationKey);
-                                localStorage.setItem('dismissedNotifications', JSON.stringify(dismissedNotifications));
+            const messageEl = document.createElement('span');
+            messageEl.textContent = notification.message;
+            notificationEl.appendChild(messageEl);
+
+            // Check if notification is an invitation and not handled
+            const isInvitation = notification.type === 'invitation' || 
+                                notification.message.includes('приглашены на мероприятие') ||
+                                notification.message.includes('добавлены в мероприятие');
+            if (isInvitation && notification.event_id && !notification.is_read && !notification.is_handled) {
+                console.log(`Rendering invitation buttons for notification ID=${notification.id}`);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'notification-buttons';
+
+                const acceptBtn = document.createElement('button');
+                acceptBtn.className = 'accept-btn';
+                acceptBtn.textContent = 'Принять';
+                acceptBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await handleInvitationResponse(notification, 'join');
+                });
+
+                const refuseBtn = document.createElement('button');
+                refuseBtn.className = 'refuse-btn';
+                refuseBtn.textContent = 'Отказать';
+                refuseBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await handleInvitationResponse(notification, 'leave');
+                });
+
+                buttonContainer.appendChild(acceptBtn);
+                buttonContainer.appendChild(refuseBtn);
+                notificationEl.appendChild(buttonContainer);
+            } else {
+                console.log(`Rendering delete button for notification ID=${notification.id}`);
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`http://localhost:3000/api/notifications/${notification.id}`, {
+                            method: 'DELETE',
+                            credentials: 'include'
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            let dismissedNotifications = JSON.parse(localStorage.getItem('dismissedNotifications') || '{}');
+                            if (!dismissedNotifications[user.id]) {
+                                dismissedNotifications[user.id] = new Set();
                             }
+                            if (notification.type === 'reminder' && notification.event_id) {
+                                const event = events.find(e => e.id === notification.event_id);
+                                if (event) {
+                                    const notificationKey = `${event.id}_${event.date}`;
+                                    dismissedNotifications[user.id].add(notificationKey);
+                                    localStorage.setItem('dismissedNotifications', JSON.stringify(dismissedNotifications));
+                                }
+                            }
+                            notifications = notifications.filter(n => n.id !== notification.id);
+                            renderNotifications();
+                            updateNotificationButton();
+                        } else {
+                            console.error('Ошибка при удалении уведомления:', result.error);
                         }
-                        notifications = notifications.filter(n => n.id !== notification.id);
-                        renderNotifications();
-                        updateNotificationButton();
-                    } else {
-                        console.error('Ошибка при удалении уведомления:', result.error);
+                    } catch (e) {
+                        console.error('Ошибка при удалении уведомления:', e);
                     }
-                } catch (e) {
-                    console.error('Ошибка при удалении уведомления:', e);
-                }
-            });
+                });
+                notificationEl.appendChild(deleteBtn);
+            }
 
-            notificationEl.appendChild(deleteBtn);
             notificationList.appendChild(notificationEl);
         });
     }
@@ -331,7 +409,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Mark notifications as read when popup is opened
     async function markNotificationsAsRead() {
-        const unreadNotifications = notifications.filter(n => !n.is_read);
+        const unreadNotifications = notifications.filter(n => !n.is_read && n.type !== 'invitation');
         for (const notification of unreadNotifications) {
             try {
                 const response = await fetch(`http://localhost:3000/api/notifications/${notification.id}/read`, {
@@ -352,7 +430,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Toggle notification popup
     notificationBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent event from bubbling up unnecessarily
+        e.stopPropagation();
         const isVisible = notificationPopup.style.display === 'flex';
         if (isVisible) {
             notificationPopup.style.display = 'none';
@@ -368,7 +446,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         notificationIcon.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            notificationBtn.click(); // Trigger the button's click event
+            notificationBtn.click();
         });
     }
 
@@ -386,7 +464,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         setInterval(async () => {
             await fetchNotifications();
             await checkUpcomingEvents();
-        }, 60000); // Check every minute
+        }, 60000);
     }
 
     // Add event listeners for real-time filtering
@@ -471,41 +549,34 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             if (event.route_data) {
                 console.log(`Попытка отобразить карту для события ${event.id} с route_data:`, event.route_data);
-                // Create map container
                 const mapContainer = document.createElement('div');
                 mapContainer.className = 'event-map-container';
                 mapContainer.id = `map-container-${event.id}`;
                 mapContainer.style.display = 'block';
 
-                // Create map element
                 const mapEl = document.createElement('div');
                 mapEl.className = 'event-map';
-                mapEl.id = `map-${event.id}`; // Unique ID for each event
+                mapEl.id = `map-${event.id}`;
                 mapContainer.appendChild(mapEl);
 
                 eventEl.appendChild(mapContainer);
 
-                // Render map directly with Leaflet
                 setTimeout(() => {
                     try {
-                        // Parse route_data
                         const routeData = typeof event.route_data === 'string' ? JSON.parse(event.route_data) : event.route_data;
                         if (!routeData.paths || !routeData.paths[0] || !routeData.paths[0].points) {
                             throw new Error('Некорректный формат route_data');
                         }
 
-                        // Initialize Leaflet map
                         const map = L.map(`map-${event.id}`, {
-                            zoomControl: true // Убедимся, что управление зумом включено
+                            zoomControl: true
                         }).setView([56.8375, 60.5975], 13);
 
-                        // Add tile layer
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                            zIndex: 1 // Устанавливаем z-index для слоя карты
+                            zIndex: 1
                         }).addTo(map);
 
-                        // Decode and render route
                         const path = routeData.paths[0];
                         const points = polyline.decode(path.points).map(coord => [coord[0], coord[1]]);
                         console.log(`Декодировано ${points.length} точек для события ${event.id}`);
@@ -518,10 +589,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                             color: '#4a6fa5',
                             weight: 5,
                             opacity: 0.7,
-                            zIndex: 2 // Устанавливаем z-index для маршрута
+                            zIndex: 2
                         }).addTo(map);
 
-                        // Render waypoints if available
                         if (path.snapped_waypoints) {
                             const waypointPoints = polyline.decode(path.snapped_waypoints).map(coord => [coord[0], coord[1]]);
                             waypointPoints.forEach((point, index) => {
@@ -529,7 +599,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                                     zIndexOffset: 10
                                 };
                                 if (index === 0) {
-                                    markerOptions.icon = redMarkerIcon; // Red icon for first waypoint
+                                    markerOptions.icon = redMarkerIcon;
                                 }
                                 const marker = L.marker(point, markerOptions).addTo(map);
                             });
@@ -540,7 +610,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const timeMin = Math.round(path.time / 60000);
                         routePolyline.bindPopup(`Расстояние: ${distanceKm} км<br>Время: ${timeMin} мин`);
 
-                        // Center map on route
                         const bounds = routePolyline.getBounds();
                         if (bounds.isValid()) {
                             map.fitBounds(bounds, { padding: [50, 50] });
@@ -562,13 +631,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 console.log(`Нет route_data для события ${event.id}`);
             }
 
-            // Add Participate button for authenticated non-creators
             if (user && user.id !== event.user_id) {
                 const joinBtn = document.createElement('button');
                 joinBtn.className = 'join-btn';
-                // Initial state
-                const initialParticipants = Array.isArray(event.participants) ? event.participants : [];
-                let isParticipant = initialParticipants.includes(user.login);
+                let isParticipant = event.participants.includes(user.login);
                 joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
                 joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
                 if (isParticipant) {
@@ -587,7 +653,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const result = await response.json();
                         console.log('Server response:', result);
 
-                        // Update participants and recalculate isParticipant
                         event.participants = result.participants || [];
                         participantsEl.textContent = `Участники: ${event.participants.length}`;
                         isParticipant = event.participants.includes(user.login);
@@ -598,7 +663,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                         console.log('Updated participants:', event.participants);
                     } catch (e) {
                         console.error(`Ошибка при ${isParticipant ? 'отказе' : 'присоединении'}:`, e);
-                        // Refetch event data to sync state
                         await fetchEventData(event.id, joinBtn, participantsEl);
                     }
                 });
@@ -618,21 +682,24 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Function to refetch event data and update UI
     async function fetchEventData(eventId, joinBtn, participantsEl) {
         try {
-            const response = await fetch(`http://localhost:3000/api/events/${eventId}`, {
+            const response = await fetch(`http://localhost:3000/api/events/${user.id}`, {
                 credentials: 'include'
             });
             const result = await response.json();
             if (result.success) {
                 const updatedEvent = result.events.find(e => e.id === eventId);
                 if (updatedEvent) {
-                    event.participants = updatedEvent.participants || [];
-                    participantsEl.textContent = `Участники: ${event.participants.length}`;
-                    const isParticipant = event.participants.includes(user.login);
-                    joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
-                    joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
-                    joinBtn.classList.toggle('join-btn-disabled', isParticipant);
-                    await fetchNotifications();
-                    console.log('Refetched participants:', event.participants);
+                    const event = events.find(e => e.id === eventId);
+                    if (event) {
+                        event.participants = updatedEvent.participants || [];
+                        participantsEl.textContent = `Участники: ${event.participants.length}`;
+                        const isParticipant = event.participants.includes(user.login);
+                        joinBtn.textContent = isParticipant ? 'Отказаться' : 'Участвовать';
+                        joinBtn.style.backgroundColor = isParticipant ? '#e74c3c' : '#4285f4';
+                        joinBtn.classList.toggle('join-btn-disabled', isParticipant);
+                        await fetchNotifications();
+                        console.log('Refetched participants:', event.participants);
+                    }
                 }
             }
         } catch (e) {

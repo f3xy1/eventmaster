@@ -332,7 +332,7 @@ nav ul li a {
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    z-index: 1001;
+    z-index: 1002; /* Increased to overlay notification button */
     display: none;
     flex-direction: column;
 }
@@ -353,7 +353,7 @@ nav ul li a {
 
 .notification-item {
     position: relative;
-    padding: 10px;
+    padding: 10px 10px 20px; /* Uniform padding */
     margin-bottom: 10px;
     border-radius: 4px;
     background-color: #f9f9f9;
@@ -364,6 +364,11 @@ nav ul li a {
 .notification-item.unread {
     background-color: #e6f0ff;
     border-left: 4px solid #4285f4;
+}
+
+.notification-item span {
+    display: block; /* Ensure message is on its own line */
+    margin-bottom: 10px; /* Space between message and buttons */
 }
 
 .notification-item .delete-btn {
@@ -382,6 +387,44 @@ nav ul li a {
     color: #c0392b;
 }
 
+.notification-buttons {
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.accept-btn {
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.2s;
+}
+
+.accept-btn:hover {
+    background-color: #27ae60;
+}
+
+.refuse-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.2s;
+}
+
+.refuse-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Media Queries */
 @media (max-width: 768px) {
     .event-map {
         height: 200px;
@@ -445,6 +488,15 @@ nav ul li a {
 
     .notification-item {
         font-size: 0.85em;
-        padding: 8px;
+        padding: 8px 8px 15px; /* Uniform padding */
+    }
+
+    .notification-buttons {
+        gap: 8px;
+    }
+
+    .accept-btn, .refuse-btn {
+        padding: 5px 10px;
+        font-size: 0.8em;
     }
 }
